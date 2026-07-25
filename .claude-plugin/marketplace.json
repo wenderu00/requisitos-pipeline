@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "requisitos-pipeline",
+  "description": "Marketplace pessoal do plugin requisitos-pipeline",
+  "owner": {
+    "name": "Marcio Wendell",
+    "email": "marcio.wendell.contact@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "requisitos-pipeline",
+      "description": "Pipeline de 6 subagentes que classifica texto livre em requisitos estruturados (user story, caso de uso, regra de negocio, requisito nao funcional) e grava YAML por necessidade",
+      "source": "./",
+      "author": {
+        "name": "Marcio Wendell",
+        "email": "marcio.wendell.contact@gmail.com"
+      }
+    }
+  ]
+}
