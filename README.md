@@ -7,10 +7,18 @@ uso, regras de negócio e requisitos não funcionais.
 
 ## Instalação
 
+Repositório privado — clone via SSH (a máquina precisa ter acesso SSH
+configurado a este repo; clone via HTTPS falha por falta de credencial):
+
 ```
-claude plugin marketplace add <url-do-repo-github>
+claude plugin marketplace add git@github.com:wenderu00/requisitos-pipeline.git
 claude plugin install requisitos-pipeline@requisitos-pipeline
 ```
+
+Se o nome `requisitos-pipeline` já estiver em uso por outra instalação
+(scope diferente ou skills-dir), a instalada por este comando tem
+precedência — a outra fica marcada como "Not loaded" até um dos dois ser
+removido ou renomeado.
 
 ## Fluxo ponta a ponta
 
