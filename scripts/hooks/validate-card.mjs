@@ -32,6 +32,14 @@ function escapeRegExp(s) {
 function matchCardType(relPath) {
   for (const typeName of CARD_TYPES) {
     const entry = schemas[typeName];
+    if (entry.singleton_filename) {
+      if (relPath === `${entry.output_dir}/${entry.singleton_filename}`) return typeName;
+      continue;
+    }
+    if (entry.filename_regex) {
+      if (new RegExp(entry.filename_regex).test(relPath)) return typeName;
+      continue;
+    }
     const re = new RegExp(
       `^${escapeRegExp(entry.output_dir)}/${escapeRegExp(entry.id_prefix)}\\d+\\.yaml$`
     );
@@ -124,6 +132,17 @@ function validateFields(fieldsSpec, dataObj, pathPrefix, errors, enumsMap) {
               enumsMap
             )
           );
+        } else if (spec.item_pattern) {
+          const itemRe = new RegExp(spec.item_pattern);
+          val.forEach((item, i) => {
+            if (typeof item !== "string") {
+              errors.push(`${fullName}[${i}]: esperado string, veio ${typeof item}`);
+            } else if (!itemRe.test(item)) {
+              errors.push(
+                `${fullName}[${i}]: valor "${item}" não bate com o padrão esperado (${spec.item_pattern})`
+              );
+            }
+          });
         }
         break;
       }
@@ -144,7 +163,22 @@ function validateFields(fieldsSpec, dataObj, pathPrefix, errors, enumsMap) {
 }
 
 function checkIdMatchesFilename(entry, relPath, data, errors) {
+  if (entry.singleton_filename) return;
+
   const basename = path.basename(relPath);
+
+  if (entry.filename_regex) {
+    if (!entry.id_field) return;
+    const expectedId = basename.replace(/\.yaml$/, "");
+    const actualId = data ? data[entry.id_field] : undefined;
+    if (actualId !== expectedId) {
+      errors.push(
+        `${entry.id_field}: é "${actualId}", mas o nome do arquivo (${basename}) implica "${expectedId}"`
+      );
+    }
+    return;
+  }
+
   const re = new RegExp(`^${escapeRegExp(entry.id_prefix)}(\\d+)\\.yaml$`);
   const m = basename.match(re);
   if (!m) return;

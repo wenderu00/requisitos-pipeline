@@ -13,12 +13,13 @@
       { "name": "alternativa_considerada", "type": "string", "nullable": true, "enum_ref": "tipo" },
       { "name": "justificativa", "type": "string", "nullable": false, "min_len": 15 },
       { "name": "possivel_duplicata_de", "type": "string", "nullable": true, "pattern": "^N-\\d+$" },
-      { "name": "motivo_duplicata", "type": "string", "nullable": true, "min_len": 5 }
+      { "name": "motivo_duplicata", "type": "string", "nullable": true, "min_len": 5 },
+      { "name": "substitui", "type": "string", "nullable": true, "pattern": "^N-\\d+$" }
     ],
     "enums": {
       "tipo": ["user_story", "caso_de_uso", "regra_de_negocio", "requisito_nao_funcional"]
     },
-    "example_yaml": "necessidade_id: N-118\ntitulo: \"Resumo curto da necessidade\"\ndescricao: \"Texto completo, no formato apropriado ao tipo (ex. 'Como <ator>, quero <ação>, para <benefício>' para user story)\"\norigem: \"Trecho ou referência do contexto de onde foi extraída\"\ntipo: user_story\nconfiança: 0.87\nalternativa_considerada: caso_de_uso\njustificativa: \"Ação simples e atômica, sem múltiplos fluxos de interação com outros atores\"\npossivel_duplicata_de: null\nmotivo_duplicata: null"
+    "example_yaml": "necessidade_id: N-118\ntitulo: \"Resumo curto da necessidade\"\ndescricao: \"Texto completo, no formato apropriado ao tipo (ex. 'Como <ator>, quero <ação>, para <benefício>' para user story)\"\norigem: \"Trecho ou referência do contexto de onde foi extraída\"\ntipo: user_story\nconfiança: 0.87\nalternativa_considerada: caso_de_uso\njustificativa: \"Ação simples e atômica, sem múltiplos fluxos de interação com outros atores\"\npossivel_duplicata_de: null\nmotivo_duplicata: null\nsubstitui: null"
   },
 
   "user_story": {
@@ -41,6 +42,9 @@
           { "name": "entao", "type": "string", "nullable": false, "min_len": 5 }
         ]
       },
+      { "name": "regras_relacionadas", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^RN-\\d+$" },
+      { "name": "rnfs_relacionados", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^RNF-\\d+$" },
+      { "name": "casos_de_uso_relacionados", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^UC-\\d+$" },
       {
         "name": "auditoria_qualidade", "type": "object", "nullable": false,
         "fields": [
@@ -50,10 +54,19 @@
           { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] }
         ]
       },
+      {
+        "name": "historico_auditoria", "type": "list", "nullable": false, "min_items": 0,
+        "item_fields": [
+          { "name": "veredito", "type": "string", "nullable": false, "enum": ["aprovado", "reprovado_apos_limite"] },
+          { "name": "rodadas", "type": "number", "nullable": false, "min": 1, "max": 3 },
+          { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] },
+          { "name": "confianca", "type": "number", "nullable": false, "min": 0, "max": 1 }
+        ]
+      },
       { "name": "confiança", "type": "number", "nullable": false, "min": 0, "max": 1 },
       { "name": "justificativa", "type": "string", "nullable": false, "min_len": 15 }
     ],
-    "example_yaml": "user_story_id: US-1\nnecessidade_origem: N-1\ntitulo: \"Resumo curto da user story\"\nator: \"cliente\"\nacao: \"adicionar um produto ao carrinho\"\nbeneficio: \"poder comprá-lo depois\"\ncriterios_aceite:\n  - dado: \"o cliente está vendo a página de um produto disponível\"\n    quando: \"o cliente clica em 'adicionar ao carrinho'\"\n    entao: \"o produto aparece no carrinho com quantidade 1\"\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nconfiança: 0.9\njustificativa: \"Descrição segue o formato padrão de user story sem ambiguidade; critério de aceite cobre o único fluxo descrito\""
+    "example_yaml": "user_story_id: US-1\nnecessidade_origem: N-1\ntitulo: \"Resumo curto da user story\"\nator: \"cliente\"\nacao: \"adicionar um produto ao carrinho\"\nbeneficio: \"poder comprá-lo depois\"\ncriterios_aceite:\n  - dado: \"o cliente está vendo a página de um produto disponível\"\n    quando: \"o cliente clica em 'adicionar ao carrinho'\"\n    entao: \"o produto aparece no carrinho com quantidade 1\"\nregras_relacionadas: []\nrnfs_relacionados: []\ncasos_de_uso_relacionados: []\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nhistorico_auditoria: []\nconfiança: 0.9\njustificativa: \"Descrição segue o formato padrão de user story sem ambiguidade; critério de aceite cobre o único fluxo descrito\""
   },
 
   "caso_de_uso": {
@@ -91,6 +104,9 @@
           { "name": "resultado", "type": "string", "nullable": false, "min_len": 5 }
         ]
       },
+      { "name": "regras_relacionadas", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^RN-\\d+$" },
+      { "name": "rnfs_relacionados", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^RNF-\\d+$" },
+      { "name": "user_stories_relacionadas", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^US-\\d+$" },
       {
         "name": "auditoria_qualidade", "type": "object", "nullable": false,
         "fields": [
@@ -100,10 +116,19 @@
           { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] }
         ]
       },
+      {
+        "name": "historico_auditoria", "type": "list", "nullable": false, "min_items": 0,
+        "item_fields": [
+          { "name": "veredito", "type": "string", "nullable": false, "enum": ["aprovado", "reprovado_apos_limite"] },
+          { "name": "rodadas", "type": "number", "nullable": false, "min": 1, "max": 3 },
+          { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] },
+          { "name": "confianca", "type": "number", "nullable": false, "min": 0, "max": 1 }
+        ]
+      },
       { "name": "confiança", "type": "number", "nullable": false, "min": 0, "max": 1 },
       { "name": "justificativa", "type": "string", "nullable": false, "min_len": 15 }
     ],
-    "example_yaml": "caso_de_uso_id: UC-2\nnecessidade_origem: N-2\ntitulo: \"Processamento de pagamento no checkout\"\natores: [\"cliente\", \"operadora de cartão\"]\nfluxo_principal:\n  passos:\n    - \"Cliente informa os dados do cartão\"\n    - \"Sistema tenta processar o pagamento\"\n    - \"Pagamento é aprovado\"\n  resultado: \"Pedido confirmado e e-mail de confirmação enviado ao cliente\"\nfluxos_alternativos:\n  - nome: \"Pagamento recusado\"\n    gatilho: \"Operadora recusa o pagamento\"\n    passos:\n      - \"Sistema mostra mensagem de erro\"\n      - \"Cliente pode tentar novamente com outro cartão\"\n    resultado: \"Pedido não é criado até um pagamento ser aprovado\"\nfluxos_excecao:\n  - nome: \"Sistema de pagamento indisponível\"\n    gatilho: \"Sistema de pagamento está fora do ar\"\n    passos:\n      - \"Sistema informa ao cliente para tentar mais tarde\"\n    resultado: \"Pedido não é criado\"\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nconfiança: 0.93\njustificativa: \"Fluxos principal, alternativo e de exceção estão todos explícitos na descrição original, sem necessidade de inferência\""
+    "example_yaml": "caso_de_uso_id: UC-2\nnecessidade_origem: N-2\ntitulo: \"Processamento de pagamento no checkout\"\natores: [\"cliente\", \"operadora de cartão\"]\nfluxo_principal:\n  passos:\n    - \"Cliente informa os dados do cartão\"\n    - \"Sistema tenta processar o pagamento\"\n    - \"Pagamento é aprovado\"\n  resultado: \"Pedido confirmado e e-mail de confirmação enviado ao cliente\"\nfluxos_alternativos:\n  - nome: \"Pagamento recusado\"\n    gatilho: \"Operadora recusa o pagamento\"\n    passos:\n      - \"Sistema mostra mensagem de erro\"\n      - \"Cliente pode tentar novamente com outro cartão\"\n    resultado: \"Pedido não é criado até um pagamento ser aprovado\"\nfluxos_excecao:\n  - nome: \"Sistema de pagamento indisponível\"\n    gatilho: \"Sistema de pagamento está fora do ar\"\n    passos:\n      - \"Sistema informa ao cliente para tentar mais tarde\"\n    resultado: \"Pedido não é criado\"\nregras_relacionadas: []\nrnfs_relacionados: []\nuser_stories_relacionadas: []\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nhistorico_auditoria: []\nconfiança: 0.93\njustificativa: \"Fluxos principal, alternativo e de exceção estão todos explícitos na descrição original, sem necessidade de inferência\""
   },
 
   "regra_de_negocio": {
@@ -119,6 +144,9 @@
       { "name": "condicao_aplicacao", "type": "string", "nullable": false, "min_len": 5 },
       { "name": "valor_ou_formula", "type": "string", "nullable": true },
       { "name": "excecoes", "type": "list", "nullable": false, "min_items": 0 },
+      { "name": "user_stories_relacionadas", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^US-\\d+$" },
+      { "name": "casos_de_uso_relacionados", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^UC-\\d+$" },
+      { "name": "rnfs_relacionados", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^RNF-\\d+$" },
       {
         "name": "auditoria_qualidade", "type": "object", "nullable": false,
         "fields": [
@@ -128,10 +156,19 @@
           { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] }
         ]
       },
+      {
+        "name": "historico_auditoria", "type": "list", "nullable": false, "min_items": 0,
+        "item_fields": [
+          { "name": "veredito", "type": "string", "nullable": false, "enum": ["aprovado", "reprovado_apos_limite"] },
+          { "name": "rodadas", "type": "number", "nullable": false, "min": 1, "max": 3 },
+          { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] },
+          { "name": "confianca", "type": "number", "nullable": false, "min": 0, "max": 1 }
+        ]
+      },
       { "name": "confiança", "type": "number", "nullable": false, "min": 0, "max": 1 },
       { "name": "justificativa", "type": "string", "nullable": false, "min_len": 15 }
     ],
-    "example_yaml": "regra_id: RN-3\nnecessidade_origem: N-3\ntitulo: \"Limite máximo de desconto por pedido\"\nenunciado: \"O desconto aplicado a qualquer pedido não pode ultrapassar 20%, independentemente da origem do desconto (cupom, promoção ou outro)\"\ncondicao_aplicacao: \"Vale para qualquer fluxo de pedido, incluindo checkout normal e recompra\"\nvalor_ou_formula: \"desconto_maximo: 20%\"\nexcecoes: []\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nconfiança: 0.97\njustificativa: \"Regra e condição de aplicação estão explícitas e sem ambiguidade na descrição original\""
+    "example_yaml": "regra_id: RN-3\nnecessidade_origem: N-3\ntitulo: \"Limite máximo de desconto por pedido\"\nenunciado: \"O desconto aplicado a qualquer pedido não pode ultrapassar 20%, independentemente da origem do desconto (cupom, promoção ou outro)\"\ncondicao_aplicacao: \"Vale para qualquer fluxo de pedido, incluindo checkout normal e recompra\"\nvalor_ou_formula: \"desconto_maximo: 20%\"\nexcecoes: []\nuser_stories_relacionadas: []\ncasos_de_uso_relacionados: []\nrnfs_relacionados: []\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nhistorico_auditoria: []\nconfiança: 0.97\njustificativa: \"Regra e condição de aplicação estão explícitas e sem ambiguidade na descrição original\""
   },
 
   "requisito_nao_funcional": {
@@ -147,6 +184,9 @@
       { "name": "metrica", "type": "string", "nullable": false, "min_len": 5 },
       { "name": "valor_alvo", "type": "string", "nullable": false, "min_len": 1 },
       { "name": "contexto_condicao", "type": "string", "nullable": true, "min_len": 3 },
+      { "name": "user_stories_relacionadas", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^US-\\d+$" },
+      { "name": "casos_de_uso_relacionados", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^UC-\\d+$" },
+      { "name": "regras_relacionadas", "type": "list", "nullable": false, "min_items": 0, "item_pattern": "^RN-\\d+$" },
       {
         "name": "auditoria_qualidade", "type": "object", "nullable": false,
         "fields": [
@@ -156,13 +196,22 @@
           { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] }
         ]
       },
+      {
+        "name": "historico_auditoria", "type": "list", "nullable": false, "min_items": 0,
+        "item_fields": [
+          { "name": "veredito", "type": "string", "nullable": false, "enum": ["aprovado", "reprovado_apos_limite"] },
+          { "name": "rodadas", "type": "number", "nullable": false, "min": 1, "max": 3 },
+          { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] },
+          { "name": "confianca", "type": "number", "nullable": false, "min": 0, "max": 1 }
+        ]
+      },
       { "name": "confiança", "type": "number", "nullable": false, "min": 0, "max": 1 },
       { "name": "justificativa", "type": "string", "nullable": false, "min_len": 15 }
     ],
     "enums": {
       "categoria": ["performance", "seguranca", "disponibilidade", "usabilidade", "escalabilidade", "outro"]
     },
-    "example_yaml": "rnf_id: RNF-4\nnecessidade_origem: N-4\ntitulo: \"Performance da busca de produtos sob pico de tráfego\"\ncategoria: performance\nmetrica: \"Tempo de resposta da busca de produtos (percentil 95)\"\nvalor_alvo: \"< 300ms\"\ncontexto_condicao: \"Mesmo sob pico de tráfego (ex. Black Friday)\"\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nconfiança: 0.96\njustificativa: \"Métrica, valor-alvo e condição de pico estão todos explícitos na descrição original\""
+    "example_yaml": "rnf_id: RNF-4\nnecessidade_origem: N-4\ntitulo: \"Performance da busca de produtos sob pico de tráfego\"\ncategoria: performance\nmetrica: \"Tempo de resposta da busca de produtos (percentil 95)\"\nvalor_alvo: \"< 300ms\"\ncontexto_condicao: \"Mesmo sob pico de tráfego (ex. Black Friday)\"\nuser_stories_relacionadas: []\ncasos_de_uso_relacionados: []\nregras_relacionadas: []\nauditoria_qualidade:\n  veredito: aprovado\n  rodadas: 1\n  feedback_pendente: []\n  motivo_falha_auditor: null\nhistorico_auditoria: []\nconfiança: 0.96\njustificativa: \"Métrica, valor-alvo e condição de pico estão todos explícitos na descrição original\""
   },
 
   "execucao": {
@@ -188,7 +237,51 @@
         ]
       }
     ],
-    "example_yaml": "execucao_id: RUN-3\nresumo_origem: \"Transcript da sessão grill-me sobre o módulo de checkout, ~4200 caracteres...\"\nconcluido: false\nnecessidades:\n  - necessidade_id: N-118\n    tipo: user_story\n    confianca: 0.87\n    status: despachado_ok\n    subagente: agente-user-story\n    cartao_gerado: user-stories/US-118.yaml\n    motivo_falha: null\n    aviso_calibracao: false\n    aviso_configuracao: null\nresumo:\n  total: 5\n  por_tipo: {user_story: 2, caso_de_uso: 1, regra_de_negocio: 1, requisito_nao_funcional: 1}\n  falhas: 1\n  confianca_baixa: [\"N-120\"]"
+    "example_yaml": "execucao_id: RUN-3\nresumo_origem: \"Transcript da sessão grill-me sobre o módulo de checkout, ~4200 caracteres...\"\nconcluido: false\nnecessidades:\n  - necessidade_id: N-118\n    tipo: user_story\n    confianca: 0.87\n    status: despachado_ok\n    subagente: agente-user-story\n    cartao_gerado: user-stories/US-118.yaml\n    motivo_falha: null\n    aviso_calibracao: false\n    aviso_configuracao: null\nresumo:\n  total: 5\n  por_tipo: {user_story: 2, caso_de_uso: 1, regra_de_negocio: 1, requisito_nao_funcional: 1}\n  falhas: 1\n  confianca_baixa: [\"N-120\"]\n  coerencia_verificada: null"
+  },
+
+  "pendencia": {
+    "output_dir": "necessidades/_pendencias",
+    "id_field": "pendencia_id",
+    "filename_regex": "^necessidades/_pendencias/PEND-(US|UC|RN|RNF)-\\d+\\.yaml$",
+    "required_fields": [
+      { "name": "pendencia_id", "type": "string", "nullable": false, "pattern": "^PEND-(US|UC|RN|RNF)-\\d+$" },
+      { "name": "cartao_relacionado", "type": "string", "nullable": false, "min_len": 3 },
+      { "name": "tipo_cartao", "type": "string", "nullable": false, "enum_ref": "tipo" },
+      { "name": "necessidade_origem", "type": "string", "nullable": false, "pattern": "^N-\\d+$" },
+      { "name": "rodadas", "type": "number", "nullable": false, "min": 1, "max": 3 },
+      { "name": "motivo_falha_auditor", "type": "string", "nullable": true, "enum": ["falha_configuracao_profundidade", "falha_auditor_outro", "resposta_invalida"] },
+      { "name": "feedback_pendente", "type": "list", "nullable": false, "min_items": 0 },
+      { "name": "confianca", "type": "number", "nullable": false, "min": 0, "max": 1 },
+      { "name": "resolvido", "type": "boolean", "nullable": false }
+    ],
+    "enums": {
+      "tipo": ["user_story", "caso_de_uso", "regra_de_negocio", "requisito_nao_funcional"]
+    },
+    "example_yaml": "pendencia_id: PEND-US-118\ncartao_relacionado: user-stories/US-118.yaml\ntipo_cartao: user_story\nnecessidade_origem: N-118\nrodadas: 3\nmotivo_falha_auditor: null\nfeedback_pendente:\n  - \"Critério de aceite não descreve um resultado observável\"\nconfianca: 0.55\nresolvido: false"
+  },
+
+  "indice": {
+    "output_dir": "necessidades/_indice",
+    "singleton_filename": "INDEX.yaml",
+    "required_fields": [
+      { "name": "schema_version", "type": "number", "nullable": false, "min": 1 },
+      {
+        "name": "entradas", "type": "list", "nullable": false, "min_items": 0,
+        "item_fields": [
+          { "name": "necessidade_id", "type": "string", "nullable": false, "pattern": "^N-\\d+$" },
+          { "name": "titulo", "type": "string", "nullable": false, "min_len": 3 },
+          { "name": "tipo", "type": "string", "nullable": false, "enum_ref": "tipo" },
+          { "name": "cartao_gerado", "type": "string", "nullable": true },
+          { "name": "status_auditoria", "type": "string", "nullable": false, "enum": ["aprovado", "reprovado_apos_limite", "pendente_ou_falha_despacho"] },
+          { "name": "substituida_por", "type": "string", "nullable": true, "pattern": "^N-\\d+$" }
+        ]
+      }
+    ],
+    "enums": {
+      "tipo": ["user_story", "caso_de_uso", "regra_de_negocio", "requisito_nao_funcional"]
+    },
+    "example_yaml": "schema_version: 1\nentradas:\n  - necessidade_id: N-1\n    titulo: \"Resumo curto da user story\"\n    tipo: user_story\n    cartao_gerado: user-stories/US-1.yaml\n    status_auditoria: aprovado\n    substituida_por: null"
   },
 
   "fragments": {
@@ -196,8 +289,12 @@
 
     "escaping_rules": "### Regras de escaping\n\nTodo campo de texto livre (`titulo`, `descricao`, `origem`, `justificativa`, `enunciado`, `condicao_aplicacao`, `passos`/`gatilho`/`resultado` de fluxos, etc.) deve ser sempre emitido entre aspas duplas — nunca sem aspas. Dentro do valor entre aspas duplas: escape `\"` como `\\\"`, escape `\\` como `\\\\`, e represente quebras de linha do texto original como `\\n` literal (nunca quebre a linha de fato dentro do valor). Nunca use block scalars (`|` ou `>`) para esses campos. Se o texto original começar com `#` ou contiver ` #` (espaço seguido de cerquilha), as aspas são obrigatórias — sem elas o YAML interpretaria o restante como comentário.\n\nUm hook de validação roda depois de cada `Write` nestes diretórios e bloqueia (pedindo correção) qualquer YAML que não parseie ou que viole o schema — trate um bloqueio desse hook como um erro a corrigir, reescrevendo o arquivo, não como um problema do conteúdo da necessidade.",
 
-    "auditoria_loop": "## Auditoria de qualidade\n\nAntes de finalizar, submeta o rascunho a uma auditoria de qualidade:\n\n1. Chame `Agent(subagent_type=\"auditor-qualidade\")` passando o rascunho atual e `tipo_cartao: {{TIPO_CARTAO}}`.\n2. Se o veredito for `aprovado`, siga para a próxima seção.\n3. Se for `reprovado`, revise especificamente os pontos listados em `feedback` (sem mexer no que já foi aprovado) e chame o auditor de novo com o rascunho revisado.\n4. Repita até aprovar ou completar **2 revisões (3 chamadas ao auditor no total)**. Se ainda estiver `reprovado` após a 3ª chamada, siga em frente mesmo assim — reduza a `confiança` e registre o feedback pendente (ver schema abaixo).\n5. Se a chamada ao auditor falhar (erro de ferramenta, limite de profundidade de subagentes atingido) ou a resposta não puder ser interpretada no formato esperado, não repita a chamada: classifique o motivo antes de decidir como prosseguir.\n   - Se o texto do erro mencionar profundidade/limite de subagentes (`profundidade`, `depth`, `spawn`, `subagent limit`, `nesting`, case-insensitive), registre `motivo_falha_auditor: falha_configuracao_profundidade` — isto é um problema de configuração do ambiente (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` baixo demais), não um problema de qualidade do rascunho.\n   - Qualquer outra falha de ferramenta vira `motivo_falha_auditor: falha_auditor_outro`.\n   - Se a chamada teve sucesso mas a resposta não pôde ser interpretada no formato esperado, vira `motivo_falha_auditor: resposta_invalida`.\n   - Em qualquer um dos três casos: trate todos os critérios como `nao_avaliavel_neste_escopo`, registre o motivo na `justificativa`, e siga em frente — nunca trave o fluxo por causa do auditor.\n\nGuarde quantas chamadas ao auditor foram feitas no total (1 a 3), o veredito final, e o `motivo_falha_auditor` (se houver) — você vai precisar desses valores no schema de saída.",
+    "auditoria_loop": "## Auditoria de qualidade\n\nAntes de finalizar, submeta o rascunho a uma auditoria de qualidade:\n\n1. Chame `Agent(subagent_type=\"auditor-qualidade\")` passando o rascunho atual, `tipo_cartao: {{TIPO_CARTAO}}`, e `outros_titulos_mesmo_tipo` (a lista `{necessidade_id, titulo}` do mesmo tipo, calculada na seção de contexto leve de artefatos existentes — lista vazia se o índice ainda não existir ou não tiver entradas desse tipo).\n2. Se o veredito for `aprovado`, siga para a próxima seção.\n3. Se for `reprovado`, revise especificamente os pontos listados em `feedback` (sem mexer no que já foi aprovado) e chame o auditor de novo com o rascunho revisado.\n4. Repita até aprovar ou completar **2 revisões (3 chamadas ao auditor no total)**. Se ainda estiver `reprovado` após a 3ª chamada, siga em frente mesmo assim — reduza a `confiança` e registre o feedback pendente (ver schema abaixo).\n5. Se a chamada ao auditor falhar (erro de ferramenta, limite de profundidade de subagentes atingido) ou a resposta não puder ser interpretada no formato esperado, não repita a chamada: classifique o motivo antes de decidir como prosseguir.\n   - Se o texto do erro mencionar profundidade/limite de subagentes (`profundidade`, `depth`, `spawn`, `subagent limit`, `nesting`, case-insensitive), registre `motivo_falha_auditor: falha_configuracao_profundidade` — isto é um problema de configuração do ambiente (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` baixo demais), não um problema de qualidade do rascunho.\n   - Qualquer outra falha de ferramenta vira `motivo_falha_auditor: falha_auditor_outro`.\n   - Se a chamada teve sucesso mas a resposta não pôde ser interpretada no formato esperado, vira `motivo_falha_auditor: resposta_invalida`.\n   - Em qualquer um dos três casos: trate todos os critérios como `nao_avaliavel_neste_escopo`, registre o motivo na `justificativa`, e siga em frente — nunca trave o fluxo por causa do auditor.\n\nGuarde quantas chamadas ao auditor foram feitas no total (1 a 3), o veredito final, e o `motivo_falha_auditor` (se houver) — você vai precisar desses valores no schema de saída.",
 
-    "auditoria_resumo_final": "Se `motivo_falha_auditor` for `falha_configuracao_profundidade`, sinalize isso de forma **distinta** de uma revisão de conteúdo: \"Auditoria de qualidade não pôde rodar por limite de profundidade de subagentes — isto é um problema de configuração do ambiente (aumente `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` para pelo menos 3), não um problema com este cartão.\" Nos demais casos (`falha_auditor_outro`, `resposta_invalida`) ou se o veredito for `reprovado_apos_limite`, sinalize que o cartão precisa de revisão manual de conteúdo antes de virar trabalho de verdade."
+    "auditoria_resumo_final": "Se `motivo_falha_auditor` for `falha_configuracao_profundidade`, sinalize isso de forma **distinta** de uma revisão de conteúdo: \"Auditoria de qualidade não pôde rodar por limite de profundidade de subagentes — isto é um problema de configuração do ambiente (aumente `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` para pelo menos 3), não um problema com este cartão.\" Nos demais casos (`falha_auditor_outro`, `resposta_invalida`) ou se o veredito for `reprovado_apos_limite`, sinalize que o cartão precisa de revisão manual de conteúdo antes de virar trabalho de verdade.",
+
+    "historico_auditoria_instrucao": "## Histórico de auditoria\n\nAntes de gravar o cartão de saída (seção seguinte), se o arquivo de destino já existir no disco (reprocessamento desta mesma necessidade), `Read` seu conteúdo atual primeiro e extraia o bloco `auditoria_qualidade` daquela versão anterior. Empurre `{veredito, rodadas, motivo_falha_auditor, confianca}` desse estado anterior para o início da lista `historico_auditoria` do novo rascunho (mantenha no máximo as 5 entradas mais recentes — descarte a mais antiga ao ultrapassar esse limite). Se o arquivo ainda não existir (primeira vez que esta necessidade é processada), `historico_auditoria: []`.",
+
+    "fila_pendencias_instrucao": "## Fila de pendências de revisão\n\nSe o `veredito` final da auditoria de qualidade (seção acima) for `reprovado_apos_limite`, além de gravar o cartão normalmente (com `auditoria_qualidade.veredito: reprovado_apos_limite`), grave também `necessidades/_pendencias/PEND-{{TIPO_CARTAO}}-<mesmo-número-da-necessidade>.yaml` com o schema `pendencia`: `cartao_relacionado` (caminho do cartão que você acabou de gravar), `tipo_cartao`, `necessidade_origem`, `rodadas`, `motivo_falha_auditor`, `feedback_pendente` (mesma lista já calculada) e `resolvido: false`.\n\nSe o `veredito` final for `aprovado` e já existir um `necessidades/_pendencias/PEND-{{TIPO_CARTAO}}-<id>.yaml` anterior para esta mesma necessidade (reprocessamento que corrigiu o problema): `Read` esse arquivo e, se `resolvido: false`, reescreva-o com `resolvido: true` — nunca apague o arquivo, ele preserva o histórico de que este cartão já passou por reprovação."
   }
 }

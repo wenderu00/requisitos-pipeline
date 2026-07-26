@@ -22,6 +22,30 @@ recebido não for `regra_de_negocio`, não gere nenhum arquivo de saída —
 registre isso no resumo final e pare (guarda de segurança: quem chama este
 agente já deveria ter filtrado por tipo, mas não confie cegamente nisso).
 
+## 1b. Contexto leve de artefatos existentes
+
+Tente `Read` de `necessidades/_indice/INDEX.yaml`. Se o arquivo não existir
+ainda, trate como lista vazia — normal em projetos novos/pequenos, não é
+erro.
+
+Se existir, filtre `entradas`:
+- As de `tipo: regra_de_negocio` viram `outros_titulos_mesmo_tipo` (lista de
+  `{necessidade_id, titulo}`) — você vai passar essa lista ao
+  `auditor-qualidade` na seção de auditoria abaixo.
+- As de `tipo: user_story`, `tipo: caso_de_uso` e
+  `tipo: requisito_nao_funcional` são candidatas para as referências
+  cruzadas do schema de saída (`user_stories_relacionadas`,
+  `casos_de_uso_relacionados`, `rnfs_relacionados`): preencha cada uma
+  dessas listas **apenas** quando o título/descrição da necessidade atual
+  mencionar explicitamente aquele outro artefato pelo nome ou por uma
+  referência inequívoca — lista vazia é o padrão seguro, um falso positivo
+  é pior que uma referência faltando.
+
+Limitação a ter em mente: o índice só contém artefatos já processados antes
+desta necessidade (execuções anteriores ou itens mais cedo nesta mesma
+execução) — nunca itens que ainda serão processados mais tarde na mesma
+leva.
+
 ## 2. Extrair os campos da regra
 
 A partir do título, descrição e origem da necessidade, extraia:
@@ -44,7 +68,7 @@ A partir do título, descrição e origem da necessidade, extraia:
 
 Antes de finalizar, submeta o rascunho a uma auditoria de qualidade:
 
-1. Chame `Agent(subagent_type="auditor-qualidade")` passando o rascunho atual e `tipo_cartao: regra_de_negocio`.
+1. Chame `Agent(subagent_type="auditor-qualidade")` passando o rascunho atual, `tipo_cartao: regra_de_negocio`, e `outros_titulos_mesmo_tipo` (a lista `{necessidade_id, titulo}` do mesmo tipo, calculada na seção de contexto leve de artefatos existentes — lista vazia se o índice ainda não existir ou não tiver entradas desse tipo).
 2. Se o veredito for `aprovado`, siga para a próxima seção.
 3. Se for `reprovado`, revise especificamente os pontos listados em `feedback` (sem mexer no que já foi aprovado) e chame o auditor de novo com o rascunho revisado.
 4. Repita até aprovar ou completar **2 revisões (3 chamadas ao auditor no total)**. Se ainda estiver `reprovado` após a 3ª chamada, siga em frente mesmo assim — reduza a `confiança` e registre o feedback pendente (ver schema abaixo).
@@ -75,11 +99,15 @@ enunciado: "O desconto aplicado a qualquer pedido não pode ultrapassar 20%, ind
 condicao_aplicacao: "Vale para qualquer fluxo de pedido, incluindo checkout normal e recompra"
 valor_ou_formula: "desconto_maximo: 20%"
 excecoes: []
+user_stories_relacionadas: []
+casos_de_uso_relacionados: []
+rnfs_relacionados: []
 auditoria_qualidade:
   veredito: aprovado
   rodadas: 1
   feedback_pendente: []
   motivo_falha_auditor: null
+historico_auditoria: []
 confiança: 0.97
 justificativa: "Regra e condição de aplicação estão explícitas e sem ambiguidade na descrição original"
 ```
@@ -91,6 +119,10 @@ Regras dos campos:
 - `justificativa`: sempre preenchida — explique o que sustenta a confiança
   ou o que a limita (ex. teve que inferir o escopo de aplicação porque não
   estava explícito).
+- `user_stories_relacionadas` / `casos_de_uso_relacionados` /
+  `rnfs_relacionados`: preenchidos conforme a seção "Contexto leve de
+  artefatos existentes" — `[]` é o padrão seguro, só preencha quando a
+  menção for genuinamente explícita no texto da necessidade.
 
 Nunca inclua critérios de aceite no formato Given/When/Then aqui — este
 schema é intencionalmente descritivo, não baseado em cenário.
@@ -103,6 +135,12 @@ Todo campo de texto livre (`titulo`, `descricao`, `origem`, `justificativa`, `en
 Um hook de validação roda depois de cada `Write` nestes diretórios e bloqueia (pedindo correção) qualquer YAML que não parseie ou que viole o schema — trate um bloqueio desse hook como um erro a corrigir, reescrevendo o arquivo, não como um problema do conteúdo da necessidade.
 <!-- SYNC:fragment:escaping_rules:END -->
 
+<!-- SYNC:fragment:historico_auditoria_instrucao:START -->
+## Histórico de auditoria
+
+Antes de gravar o cartão de saída (seção seguinte), se o arquivo de destino já existir no disco (reprocessamento desta mesma necessidade), `Read` seu conteúdo atual primeiro e extraia o bloco `auditoria_qualidade` daquela versão anterior. Empurre `{veredito, rodadas, motivo_falha_auditor, confianca}` desse estado anterior para o início da lista `historico_auditoria` do novo rascunho (mantenha no máximo as 5 entradas mais recentes — descarte a mais antiga ao ultrapassar esse limite). Se o arquivo ainda não existir (primeira vez que esta necessidade é processada), `historico_auditoria: []`.
+<!-- SYNC:fragment:historico_auditoria_instrucao:END -->
+
 ## 5. Gravar
 
 Use `Write` para criar `regras-de-negocio/RN-<id>.yaml` com o schema acima
@@ -110,6 +148,14 @@ Use `Write` para criar `regras-de-negocio/RN-<id>.yaml` com o schema acima
 existir). Não modifique o arquivo original em `necessidades/N-<id>.yaml` —
 ele continua sendo a fonte de verdade bruta; o cartão de regra de negócio é
 um artefato derivado.
+
+<!-- SYNC:fragment:fila_pendencias_instrucao:RN:START -->
+## Fila de pendências de revisão
+
+Se o `veredito` final da auditoria de qualidade (seção acima) for `reprovado_apos_limite`, além de gravar o cartão normalmente (com `auditoria_qualidade.veredito: reprovado_apos_limite`), grave também `necessidades/_pendencias/PEND-RN-<mesmo-número-da-necessidade>.yaml` com o schema `pendencia`: `cartao_relacionado` (caminho do cartão que você acabou de gravar), `tipo_cartao`, `necessidade_origem`, `rodadas`, `motivo_falha_auditor`, `feedback_pendente` (mesma lista já calculada) e `resolvido: false`.
+
+Se o `veredito` final for `aprovado` e já existir um `necessidades/_pendencias/PEND-RN-<id>.yaml` anterior para esta mesma necessidade (reprocessamento que corrigiu o problema): `Read` esse arquivo e, se `resolvido: false`, reescreva-o com `resolvido: true` — nunca apague o arquivo, ele preserva o histórico de que este cartão já passou por reprovação.
+<!-- SYNC:fragment:fila_pendencias_instrucao:RN:END -->
 
 ## 6. Resumo final
 

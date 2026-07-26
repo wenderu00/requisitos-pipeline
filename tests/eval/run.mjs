@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..", "..");
 const FIXTURES_DIR = path.join(ROOT, "tests", "fixtures");
 const RUNS_DIR = path.join(ROOT, "tests", "eval", ".runs");
+const schemas = JSON.parse(readFileSync(path.join(ROOT, "schemas", "schemas.json"), "utf8"));
 
 const SEGUNDA_EXECUCAO_MARKER = "---SEGUNDA-EXECUCAO---";
 const CLI_TIMEOUT_MS = 6 * 60 * 1000;
@@ -41,6 +42,39 @@ function readNecessidades(scratchDir) {
       if (data) result.push(data);
     } catch (err) {
       console.log(`    ! ${entry.name} não parseou como YAML: ${err.message.split("\n")[0]}`);
+    }
+  }
+  return result;
+}
+
+function readIndice(scratchDir) {
+  const filePath = path.join(scratchDir, "necessidades", "_indice", "INDEX.yaml");
+  try {
+    const data = loadYaml(readFileSync(filePath, "utf8"));
+    return data && Array.isArray(data.entradas) ? data : { entradas: [] };
+  } catch {
+    return { entradas: [] };
+  }
+}
+
+function readCards(scratchDir, tipoName) {
+  const entry = schemas[tipoName];
+  const dir = path.join(scratchDir, entry.output_dir);
+  let files;
+  try {
+    files = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const idRe = new RegExp(`^${entry.id_prefix}\\d+\\.yaml$`);
+  const result = [];
+  for (const f of files) {
+    if (!f.isFile() || !idRe.test(f.name)) continue;
+    try {
+      const data = loadYaml(readFileSync(path.join(dir, f.name), "utf8"));
+      if (data) result.push(data);
+    } catch {
+      // arquivo malformado é reportado pelo hook de validação, não pela suíte de classificação
     }
   }
   return result;
@@ -118,6 +152,29 @@ function runFixture(name) {
     const temDuplicataSinalizada = necessidades.some((n) => n.possivel_duplicata_de);
     if (!temDuplicataSinalizada) {
       problemas.push("nenhuma necessidade foi sinalizada com possivel_duplicata_de (esperado após a 2ª execução)");
+    }
+  }
+
+  const indice = readIndice(scratchDir);
+  if (necessidades.length > 0 && indice.entradas.length !== necessidades.length) {
+    problemas.push(
+      `índice central (INDEX.yaml) tem ${indice.entradas.length} entrada(s), esperado ${necessidades.length} (uma por necessidade)`
+    );
+  }
+
+  if (expected.require_substitui_flag) {
+    const temSubstitui = necessidades.some((n) => n.substitui);
+    if (!temSubstitui) {
+      problemas.push("nenhuma necessidade tem substitui preenchido (esperada reclassificação explícita)");
+    }
+  }
+
+  if (expected.require_cross_reference) {
+    const { tipo, campo } = expected.require_cross_reference;
+    const cards = readCards(scratchDir, tipo);
+    const temReferencia = cards.some((c) => Array.isArray(c[campo]) && c[campo].length > 0);
+    if (!temReferencia) {
+      problemas.push(`nenhum cartão do tipo "${tipo}" tem "${campo}" preenchido (esperada referência cruzada)`);
     }
   }
 

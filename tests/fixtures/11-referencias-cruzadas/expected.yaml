@@ -1,0 +1,6 @@
+tipos_esperados: [regra_de_negocio, user_story]
+minimo_necessidades: 2
+segunda_execucao: true
+require_cross_reference:
+  tipo: user_story
+  campo: regras_relacionadas

@@ -1,0 +1,4 @@
+tipos_esperados: [user_story, caso_de_uso]
+minimo_necessidades: 2
+segunda_execucao: true
+require_substitui_flag: true

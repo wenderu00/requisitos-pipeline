@@ -1,6 +1,6 @@
 # requisitos-pipeline
 
-Pipeline de 6 subagentes que transforma texto livre (ex. transcript de uma
+Pipeline de 7 subagentes que transforma texto livre (ex. transcript de uma
 sessão do skill `grill-me`, ou qualquer texto colado na conversa) em
 requisitos estruturados e versionados como YAML — user stories, casos de
 uso, regras de negócio e requisitos não funcionais.
@@ -25,14 +25,19 @@ removido ou renomeado.
 ```
 texto livre (transcript, ex. saída do skill grill-me)
   -> classificador-requisitos
+       carrega necessidades/_indice/INDEX.yaml (visão barata do que já existe)
        extrai necessidades, grava necessidades/N-<id>.yaml
        despacha, uma necessidade por vez, logo após gravar cada N-<id>:
          user_story              -> agente-user-story        -> user-stories/US-<id>.yaml
          caso_de_uso              -> agente-caso-de-uso        -> casos-de-uso/UC-<id>.yaml
          regra_de_negocio         -> agente-regra-de-negocio   -> regras-de-negocio/RN-<id>.yaml
          requisito_nao_funcional  -> agente-requisito-nao-funcional -> requisitos-nao-funcionais/RNF-<id>.yaml
-       (os 4 acima chamam auditor-qualidade internamente, até 3x cada, com
-       critérios de qualidade específicos do seu tipo)
+       (os 4 acima leem o índice para visão mínima de outros artefatos e
+       referências cruzadas, e chamam auditor-qualidade internamente, até 3x
+       cada, com critérios de qualidade específicos do seu tipo)
+       atualiza necessidades/_indice/INDEX.yaml a cada necessidade despachada
+       ao final: chama auditor-coerencia uma vez (automático, best-effort)
+       comparando os cartões já materializados entre si
 ```
 
 Todos os diretórios de saída (`necessidades/`, `user-stories/`,
@@ -61,6 +66,13 @@ de forma determinística.
 especializados, um por vez (avaliador puro, sem `tools`, sem persistência
 própria), com critérios de qualidade diferentes por tipo de cartão.
 
+`auditor-coerencia` também é estritamente interno: só é chamado pelo
+`classificador-requisitos`, uma única vez ao final de cada execução
+(automático, best-effort — nunca trava o fluxo). Ele lê os cartões já
+materializados (não só o rascunho corrente) e reporta possíveis
+contradições, duplicidades ou sobreposições entre artefatos, inclusive de
+tipos diferentes.
+
 ## Convenção de diretórios de saída
 
 | Diretório | Arquivo | Campo de origem |
@@ -71,6 +83,8 @@ própria), com critérios de qualidade diferentes por tipo de cartão.
 | `regras-de-negocio/` | `RN-<id>.yaml` | `necessidade_origem: N-<id>` |
 | `requisitos-nao-funcionais/` | `RNF-<id>.yaml` | `necessidade_origem: N-<id>` |
 | `necessidades/_execucoes/` | `RUN-<id>.yaml` | — (log da própria execução, não deriva de uma necessidade) |
+| `necessidades/_indice/` | `INDEX.yaml` | — (índice cumulativo entre execuções, arquivo único) |
+| `necessidades/_pendencias/` | `PEND-<US\|UC\|RN\|RNF>-<id>.yaml` | reaproveita o número da necessidade de origem (fila de revisão para cartões `reprovado_apos_limite`) |
 
 ## Schema de `necessidades/N-<id>.yaml`
 
@@ -86,6 +100,7 @@ alternativa_considerada: caso_de_uso
 justificativa: "Ação simples e atômica, sem múltiplos fluxos de interação com outros atores"
 possivel_duplicata_de: null
 motivo_duplicata: null
+substitui: null
 ```
 <!-- SYNC:schema:necessidade:END -->
 
@@ -98,10 +113,19 @@ sobrescreve `necessidades/N-<id>.yaml` de execuções anteriores.
 Campo comum a todos: `confiança` (0.00–1.00) + `justificativa` sempre
 preenchida. Schema completo em cada `agents/agente-*.md` deste plugin.
 
-Os 4 cartões especializados também levam um bloco comum
-`auditoria_qualidade` (`veredito`, `rodadas` 1–3, `feedback_pendente`,
-`motivo_falha_auditor`) — critérios avaliados variam por tipo, ver
-`agents/auditor-qualidade.md`.
+Os 4 cartões especializados também levam:
+- Um bloco comum `auditoria_qualidade` (`veredito`, `rodadas` 1–3,
+  `feedback_pendente`, `motivo_falha_auditor`) — critérios avaliados variam
+  por tipo, ver `agents/auditor-qualidade.md`.
+- `historico_auditoria` (lista, cap de 5 entradas mais recentes) —
+  preserva o `auditoria_qualidade` de versões anteriores do cartão quando
+  ele é reprocessado, em vez de simplesmente sobrescrever o veredito
+  anterior sem deixar rastro.
+- Três campos de referência cruzada para os outros três tipos (ex.
+  `regras_relacionadas`, `rnfs_relacionados`, `casos_de_uso_relacionados`
+  em `user_story`) — listas de IDs, `[]` por padrão, preenchidas só quando
+  o texto da necessidade menciona explicitamente outro artefato já
+  materializado.
 
 - **`user-stories/US-<id>.yaml`**: `ator` / `acao` / `beneficio`,
   `criterios_aceite` (lista de `dado`/`quando`/`entao`).
@@ -120,13 +144,46 @@ determinística ao reprocessar a mesma necessidade — diferente de
 `necessidades/N-<id>.yaml`, que nunca é sobrescrito por uma nova execução do
 classificador.
 
+## Índice central
+
+`necessidades/_indice/INDEX.yaml` é um arquivo único, cumulativo entre
+execuções (diferente de `RUN-<n>.yaml`, que é só da execução corrente),
+mantido pelo `classificador-requisitos`: uma entrada por necessidade, com
+`necessidade_id`, `titulo`, `tipo`, `cartao_gerado`, `status_auditoria` e
+`substituida_por`. É a fonte barata (só títulos/IDs, não conteúdo completo)
+que os agentes especializados consultam para visão mínima de outros
+artefatos (critério `independente`/`duplicidade_semantica` do
+`auditor-qualidade`) e para preencher as referências cruzadas.
+
+## Fila de pendências de revisão
+
+Quando um cartão sai `reprovado_apos_limite` (esgotou as 3 chamadas ao
+`auditor-qualidade` sem aprovar), o agente especializado grava também
+`necessidades/_pendencias/PEND-<US|UC|RN|RNF>-<id>.yaml` — uma fila real
+para revisão humana, com `resolvido: false`. Se o cartão for reprocessado
+depois e aprovar, o mesmo arquivo é atualizado para `resolvido: true`
+(nunca apagado, preserva o histórico de que já passou por reprovação).
+
+## Reclassificação de necessidades
+
+`necessidades/N-<id>.yaml` nunca é reescrito, nem para corrigir uma
+classificação errada. Se o usuário pedir explicitamente para corrigir o
+`tipo` de uma necessidade já existente, o classificador cria uma nova
+necessidade com `substitui: N-<antigo>` preenchido, despacha normalmente
+pelo tipo correto, e marca no índice central que a antiga foi
+`substituida_por` a nova. O classificador nunca infere isso sozinho a
+partir da deduplicação automática — exige pedido explícito do usuário.
+
 ## Profundidade de subagentes
 
 Cadeia real: `classificador-requisitos` (nível 1) → `agente-*` (nível 2) →
 `auditor-qualidade` (nível 3, chamado pelos 4 tipos de cartão, até 3
-chamadas por cartão). Se você tiver `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`
-configurado baixo, aumente para pelo menos 3 — se estiver baixo demais, a
-falha aparece distinta no resumo final do agente especializado
+chamadas por cartão). `auditor-coerencia` é um ramo irmão mais raso
+(nível 1 → nível 2, chamado direto pelo classificador), não empilhado sobre
+o ramo de auditoria de qualidade — não aumenta a profundidade máxima. Se
+você tiver `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` configurado baixo, aumente
+para pelo menos 3 — se estiver baixo demais, a falha aparece distinta no
+resumo final do agente especializado
 (`motivo_falha_auditor: falha_configuracao_profundidade`) para não ser
 confundida com um problema de conteúdo do cartão.
 
@@ -167,10 +224,22 @@ outcomes estruturados por necessidade de forma confiável).
 
 ## Suíte de regressão de classificação
 
-`tests/` tem uma suíte manual (não roda em CI) que invoca o Claude Code real
-contra 9 fixtures para checar se as regras de classificação/desempate ainda
-produzem os tipos esperados depois de uma mudança de prompt. Ver
-`tests/README.md` para uso (`node tests/eval/run.mjs`).
+`tests/eval/` tem uma suíte manual (não roda em CI) que invoca o Claude Code
+real contra 11 fixtures para checar se as regras de classificação/desempate,
+o índice central, a reclassificação e as referências cruzadas continuam
+funcionando depois de uma mudança de prompt. Ver `tests/README.md` para uso
+(`node tests/eval/run.mjs`).
+
+## Verificação de integridade
+
+`scripts/check-integrity.mjs <diretório>` é um script standalone (sem LLM,
+sem dependências) que verifica um projeto que já usou o pipeline: cartões
+órfãos (`necessidade_origem` que não existe), necessidades sem cartão nem
+falha de despacho registrada, e referências (`substitui`, referências
+cruzadas) quebradas. `tests/integrity/` tem uma suíte sintética própria
+(`node --test tests/integrity/`), sem chamar o Claude Code — a primeira
+suíte deste repo capaz de rodar em CI. Detalhes em
+[`docs/integrity.md`](docs/integrity.md).
 
 ## Tratamento de falha
 

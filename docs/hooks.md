@@ -39,6 +39,24 @@ Limitação conhecida: `O_CREAT|O_EXCL` é atômico em filesystems locais
 POSIX; sistemas de arquivo em rede mais antigos podem ter garantias mais
 fracas.
 
+### Por que `claim-id.mjs` não protege `_pendencias/` nem `_indice/`
+
+Dois artefatos novos do pipeline não passam por este hook, deliberadamente:
+
+- `necessidades/_pendencias/PEND-<US|UC|RN|RNF>-<id>.yaml` reaproveita o
+  número da necessidade de origem — não há "próximo ID" calculado via
+  `Glob`+incremento, então não existe a corrida que este hook resolve.
+- `necessidades/_indice/INDEX.yaml` tem nome fixo, sem número nenhum a
+  calcular.
+
+Em ambos os casos, o comportamento nativo do `Write` (recusa sobrescrever
+um arquivo que já existe em disco sem tê-lo lido antes) já é suficiente. O
+único risco residual real, não coberto por nenhum hook, é um *lost update*
+em `INDEX.yaml` sob duas execuções do `classificador-requisitos`
+genuinamente concorrentes (ambas leem a mesma versão, ambas escrevem, a
+segunda apaga a entrada que a primeira acabou de adicionar) — um trade-off
+aceito porque o uso normal do plugin é sequencial, não paralelo.
+
 ## `scripts/hooks/validate-card.mjs` (`PostToolUse`, matcher `Write`)
 
 Sem este hook, nada garantia que o YAML gerado por um LLM fosse
@@ -57,3 +75,12 @@ Também implementa a heurística de calibração: sinaliza (sem bloquear)
 cartões com confiança alta mas campos obrigatórios "rasos" (vazios,
 placeholder, ou idênticos ao exemplo do schema) — um sinal de que a
 confiança declarada pode não refletir o conteúdo real do cartão.
+
+Generalizado para suportar tipos de artefato que não seguem o padrão
+`output_dir/id_prefix<número>.yaml` (`filename_regex`, `singleton_filename`
+— ver `docs/schemas.md`) e para validar listas de strings simples item a
+item via `item_pattern` (usado pelos campos de referência cruzada, ex.
+`regras_relacionadas: ["RN-3"]`) — essa validação é só de formato (o item
+parece um ID válido daquele tipo), não de existência real do artefato
+referenciado; isso fica a cargo de `scripts/check-integrity.mjs`, que lê o
+disco inteiro e pode custar mais do que um hook por-`Write` deveria.

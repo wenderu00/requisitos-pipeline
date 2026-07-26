@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "requisitos-pipeline",
-      "description": "Pipeline de 6 subagentes que classifica texto livre em requisitos estruturados (user story, caso de uso, regra de negocio, requisito nao funcional) e grava YAML por necessidade",
+      "description": "Pipeline de 7 subagentes que classifica texto livre em requisitos estruturados (user story, caso de uso, regra de negocio, requisito nao funcional) e grava YAML por necessidade",
       "source": "./",
       "author": {
         "name": "Marcio Wendell",

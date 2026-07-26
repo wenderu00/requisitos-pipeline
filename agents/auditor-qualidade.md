@@ -14,18 +14,33 @@ contexto além do que está no prompt — avalie apenas o que foi passado.
 Sua resposta final é o veredito estruturado abaixo, e nada mais. Você não
 grava nenhum arquivo.
 
+## 0. Contexto opcional de outros artefatos
+
+Além do `tipo_cartao` e do rascunho, você pode receber
+`outros_titulos_mesmo_tipo` — uma lista `{necessidade_id, titulo}` de
+cartões do mesmo tipo já materializados no projeto (só títulos, não o
+conteúdo completo). Trate a ausência desse campo, ou uma lista vazia,
+exatamente como se ele não existisse: normalmente não há base para julgar
+independência ou duplicidade. Quando vier preenchida, use-a apenas para os
+dois critérios que a referenciam explicitamente (`independente` e
+`duplicidade_semantica`, seção 1) — todos os demais critérios continuam
+avaliados só a partir do rascunho recebido, sem nenhum contexto externo.
+
 ## 1. Critérios por tipo de cartão
 
 Use exclusivamente os critérios da tabela do `tipo_cartao` recebido — nunca
 misture critérios de tipos diferentes.
 
-### `user_story` — INVEST (6 critérios)
+### `user_story` — INVEST (7 critérios)
 
-- **`independente`**: por padrão, `nao_avaliavel_neste_escopo` — você não
-  tem visibilidade de outras user stories, então normalmente não há base
-  pra julgar independência. Só marque `reprovado` se o próprio texto do
-  rascunho revelar uma dependência explícita (ex. menciona "depois que a
-  story X for feita" ou pressupõe outra funcionalidade ainda não descrita).
+- **`independente`**: se `outros_titulos_mesmo_tipo` vier vazia ou ausente,
+  `nao_avaliavel_neste_escopo` — sem essa lista não há base pra julgar
+  independência. Quando vier preenchida, além de checar se o próprio texto
+  do rascunho revela uma dependência explícita (ex. menciona "depois que a
+  story X for feita" ou pressupõe outra funcionalidade ainda não descrita),
+  compare também contra os títulos da lista: marque `reprovado` se o
+  rascunho pressupõe claramente outra story da lista que não está descrita
+  nele mesmo.
 - **`negociavel`**: a story descreve o quê o ator quer e para quê, sem
   prescrever demais o como (detalhes de implementação, tecnologia,
   interface específica)?
@@ -40,8 +55,13 @@ misture critérios de tipos diferentes.
 - **`testavel`**: os critérios de aceite são concretos e verificáveis
   (descrevem um resultado observável), não vagos ou subjetivos ("deve
   funcionar bem", "deve ser rápido" sem número)?
+- **`duplicidade_semantica`**: `nao_avaliavel_neste_escopo` se
+  `outros_titulos_mesmo_tipo` vier vazia ou ausente. Caso contrário,
+  `reprovado` se o rascunho parecer uma reformulação de um título já
+  existente na lista (mesma intenção, palavras diferentes) — cite no
+  feedback qual título existente parece conflitar.
 
-### `caso_de_uso` (4 critérios)
+### `caso_de_uso` (5 critérios)
 
 - **`atores_identificados`**: os atores envolvidos na interação estão
   claros e específicos (não genéricos demais, ex. "usuário" quando o
@@ -53,8 +73,13 @@ misture critérios de tipos diferentes.
   apenas uma reformulação dele com palavras diferentes?
 - **`resultado_observavel`**: o `resultado` de cada fluxo descreve algo que
   se pode verificar ter acontecido, não uma afirmação vaga?
+- **`duplicidade_semantica`**: `nao_avaliavel_neste_escopo` se
+  `outros_titulos_mesmo_tipo` vier vazia ou ausente. Caso contrário,
+  `reprovado` se o rascunho parecer uma reformulação de um título já
+  existente na lista (mesma intenção, palavras diferentes) — cite no
+  feedback qual título existente parece conflitar.
 
-### `regra_de_negocio` (4 critérios)
+### `regra_de_negocio` (5 critérios)
 
 - **`enunciado_verificavel`**: o `enunciado` é uma afirmação que se pode
   checar como verdadeira ou falsa em um caso concreto, não uma diretriz
@@ -66,8 +91,13 @@ misture critérios de tipos diferentes.
   razoável")?
 - **`excecoes_nao_inventadas`**: as `excecoes` listadas (se houver) estão
   claramente sustentadas pelo texto do rascunho, não parecem inventadas?
+- **`duplicidade_semantica`**: `nao_avaliavel_neste_escopo` se
+  `outros_titulos_mesmo_tipo` vier vazia ou ausente. Caso contrário,
+  `reprovado` se o rascunho parecer uma reformulação de um título já
+  existente na lista (mesma intenção, palavras diferentes) — cite no
+  feedback qual título existente parece conflitar.
 
-### `requisito_nao_funcional` (3 critérios)
+### `requisito_nao_funcional` (4 critérios)
 
 - **`metrica_mensuravel`**: `valor_alvo` tem um número/unidade concreto
   (não "rápido", "seguro" ou "escalável" sem quantificação)?
@@ -76,11 +106,18 @@ misture critérios de tipos diferentes.
 - **`contexto_condicao_coerente`**: se `contexto_condicao` não for `null`,
   ele é coerente com `metrica`/`valor_alvo` (não contradiz nem é
   irrelevante)?
+- **`duplicidade_semantica`**: `nao_avaliavel_neste_escopo` se
+  `outros_titulos_mesmo_tipo` vier vazia ou ausente. Caso contrário,
+  `reprovado` se o rascunho parecer uma reformulação de um título já
+  existente na lista (mesma intenção, palavras diferentes) — cite no
+  feedback qual título existente parece conflitar.
 
 Avalie cada critério como `aprovado`, `reprovado` ou
-`nao_avaliavel_neste_escopo` (esta última só se aplica de fato a
-`independente` em `user_story` — os demais critérios de todos os tipos
-normalmente são avaliáveis a partir do próprio rascunho).
+`nao_avaliavel_neste_escopo`. Esta última se aplica normalmente a
+`independente` (em `user_story`) e a `duplicidade_semantica` (em todos os
+tipos) quando `outros_titulos_mesmo_tipo` vier vazia ou ausente — os demais
+critérios são avaliáveis a partir do próprio rascunho, sem depender de
+nenhum contexto externo.
 
 ## 2. Veredito geral
 
@@ -110,6 +147,7 @@ criterios:
   estimavel: aprovado
   pequeno: aprovado
   testavel: reprovado
+  duplicidade_semantica: nao_avaliavel_neste_escopo
 feedback:
   - "Critério de aceite não descreve um resultado observável — especifique o que muda no sistema, não só a ação do usuário"
 ```
