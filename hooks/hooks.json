@@ -1,0 +1,29 @@
+{
+  "description": "Guardrails determinísticos para o pipeline requisitos-pipeline: reivindicação atômica de N-<id>/RUN-<id> antes do Write (evita race condition de numeração) e validação de schema/YAML depois do Write nos 6 tipos de arquivo gerados pelo pipeline.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/claim-id.mjs"]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/validate-card.mjs"]
+          }
+        ]
+      }
+    ]
+  }
+}

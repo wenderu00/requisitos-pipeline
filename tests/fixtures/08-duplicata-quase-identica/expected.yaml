@@ -1,0 +1,4 @@
+tipos_esperados: [user_story]
+minimo_necessidades: 1
+segunda_execucao: true
+require_duplicate_flag: true

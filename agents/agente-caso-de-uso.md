@@ -1,7 +1,7 @@
 ---
 name: agente-caso-de-uso
 description: Recebe uma necessidade já classificada como caso_de_uso (tipicamente o conteúdo de necessidades/N-<id>.yaml) e gera um cartão de caso de uso estruturado — atores, fluxo principal, fluxos alternativos e de exceção — em casos-de-uso/UC-<id>.yaml.
-tools: Read, Write
+tools: Read, Write, Agent(auditor-qualidade)
 ---
 
 Você recebe, no prompt da chamada, o conteúdo (ou o caminho) de uma
@@ -49,6 +49,24 @@ Nunca invente um fluxo que não esteja sugerido pelo texto da necessidade
 principal, deixe `fluxos_alternativos` e `fluxos_excecao` como listas
 vazias.
 
+<!-- SYNC:fragment:auditoria_loop:caso_de_uso:START -->
+## Auditoria de qualidade
+
+Antes de finalizar, submeta o rascunho a uma auditoria de qualidade:
+
+1. Chame `Agent(subagent_type="auditor-qualidade")` passando o rascunho atual e `tipo_cartao: caso_de_uso`.
+2. Se o veredito for `aprovado`, siga para a próxima seção.
+3. Se for `reprovado`, revise especificamente os pontos listados em `feedback` (sem mexer no que já foi aprovado) e chame o auditor de novo com o rascunho revisado.
+4. Repita até aprovar ou completar **2 revisões (3 chamadas ao auditor no total)**. Se ainda estiver `reprovado` após a 3ª chamada, siga em frente mesmo assim — reduza a `confiança` e registre o feedback pendente (ver schema abaixo).
+5. Se a chamada ao auditor falhar (erro de ferramenta, limite de profundidade de subagentes atingido) ou a resposta não puder ser interpretada no formato esperado, não repita a chamada: classifique o motivo antes de decidir como prosseguir.
+   - Se o texto do erro mencionar profundidade/limite de subagentes (`profundidade`, `depth`, `spawn`, `subagent limit`, `nesting`, case-insensitive), registre `motivo_falha_auditor: falha_configuracao_profundidade` — isto é um problema de configuração do ambiente (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` baixo demais), não um problema de qualidade do rascunho.
+   - Qualquer outra falha de ferramenta vira `motivo_falha_auditor: falha_auditor_outro`.
+   - Se a chamada teve sucesso mas a resposta não pôde ser interpretada no formato esperado, vira `motivo_falha_auditor: resposta_invalida`.
+   - Em qualquer um dos três casos: trate todos os critérios como `nao_avaliavel_neste_escopo`, registre o motivo na `justificativa`, e siga em frente — nunca trave o fluxo por causa do auditor.
+
+Guarde quantas chamadas ao auditor foram feitas no total (1 a 3), o veredito final, e o `motivo_falha_auditor` (se houver) — você vai precisar desses valores no schema de saída.
+<!-- SYNC:fragment:auditoria_loop:caso_de_uso:END -->
+
 ## 4. Determinar o ID de saída
 
 O `caso_de_uso_id` é `UC-<mesmo-número-do-necessidade_id>` — ex.
@@ -59,6 +77,7 @@ origem é 1:1 e determinístico.
 
 ## 5. Schema do YAML de saída
 
+<!-- SYNC:schema:caso_de_uso:START -->
 ```yaml
 caso_de_uso_id: UC-2
 necessidade_origem: N-2
@@ -83,9 +102,15 @@ fluxos_excecao:
     passos:
       - "Sistema informa ao cliente para tentar mais tarde"
     resultado: "Pedido não é criado"
+auditoria_qualidade:
+  veredito: aprovado
+  rodadas: 1
+  feedback_pendente: []
+  motivo_falha_auditor: null
 confiança: 0.93
 justificativa: "Fluxos principal, alternativo e de exceção estão todos explícitos na descrição original, sem necessidade de inferência"
 ```
+<!-- SYNC:schema:caso_de_uso:END -->
 
 Regras dos campos:
 - `confiança`: autoavaliação sua de 0.00 a 1.00 sobre o quanto os fluxos
@@ -94,6 +119,14 @@ Regras dos campos:
 - `justificativa`: sempre preenchida — explique o que sustenta a confiança
   ou o que a limita (ex. teve que inferir o gatilho de um fluxo alternativo
   porque não estava explícito).
+
+<!-- SYNC:fragment:escaping_rules:START -->
+### Regras de escaping
+
+Todo campo de texto livre (`titulo`, `descricao`, `origem`, `justificativa`, `enunciado`, `condicao_aplicacao`, `passos`/`gatilho`/`resultado` de fluxos, etc.) deve ser sempre emitido entre aspas duplas — nunca sem aspas. Dentro do valor entre aspas duplas: escape `"` como `\"`, escape `\` como `\\`, e represente quebras de linha do texto original como `\n` literal (nunca quebre a linha de fato dentro do valor). Nunca use block scalars (`|` ou `>`) para esses campos. Se o texto original começar com `#` ou contiver ` #` (espaço seguido de cerquilha), as aspas são obrigatórias — sem elas o YAML interpretaria o restante como comentário.
+
+Um hook de validação roda depois de cada `Write` nestes diretórios e bloqueia (pedindo correção) qualquer YAML que não parseie ou que viole o schema — trate um bloqueio desse hook como um erro a corrigir, reescrevendo o arquivo, não como um problema do conteúdo da necessidade.
+<!-- SYNC:fragment:escaping_rules:END -->
 
 ## 6. Gravar
 
@@ -107,6 +140,13 @@ derivado.
 
 Depois de gravar o arquivo, imprima um resumo no chat: o `caso_de_uso_id`
 gerado, o `titulo`, o número de fluxos alternativos + de exceção
-identificados, e a `confiança`. Se `confiança < 0.6`, sinalize explicitamente
-que esse caso de uso precisa de revisão manual antes de virar trabalho de
-verdade.
+identificados, o veredito da auditoria de qualidade, e a `confiança`. Se
+`confiança < 0.6` ou o veredito da auditoria for `reprovado_apos_limite`,
+sinalize explicitamente que esse caso de uso precisa de revisão manual antes
+de virar trabalho de verdade. Se o hook de validação emitiu um aviso de
+calibração (`additionalContext` após o `Write`), trate isso como o mesmo
+sinal de revisão manual, mesmo que `confiança` esteja alta.
+
+<!-- SYNC:fragment:auditoria_resumo_final:START -->
+Se `motivo_falha_auditor` for `falha_configuracao_profundidade`, sinalize isso de forma **distinta** de uma revisão de conteúdo: "Auditoria de qualidade não pôde rodar por limite de profundidade de subagentes — isto é um problema de configuração do ambiente (aumente `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` para pelo menos 3), não um problema com este cartão." Nos demais casos (`falha_auditor_outro`, `resposta_invalida`) ou se o veredito for `reprovado_apos_limite`, sinalize que o cartão precisa de revisão manual de conteúdo antes de virar trabalho de verdade.
+<!-- SYNC:fragment:auditoria_resumo_final:END -->

@@ -53,7 +53,7 @@ Ao decidir entre dois tipos próximos, use estas regras de desempate:
   de valor, mas uma característica de qualidade mensurável (tempo de resposta,
   uptime, criptografia, etc.), prefira requisito não funcional.
 
-## 3. Determinar o próximo `necessidade_id`
+## 3. Determinar o próximo `necessidade_id` e iniciar o log de execução
 
 Antes de gravar qualquer arquivo, use `Glob` para listar `necessidades/N-*.yaml`
 no diretório atual. Extraia o número de cada nome de arquivo (`N-<numero>.yaml`),
@@ -61,21 +61,61 @@ pegue o maior, e comece a numerar as novas necessidades a partir de `maior + 1`.
 Se não houver nenhum arquivo existente, comece em `N-1`. Numere sequencialmente
 para todas as necessidades extraídas nesta execução (não pule números).
 
-## 4. Schema do YAML
+Em seguida, **antes de processar qualquer necessidade**, inicie o log
+persistente desta execução (isso existe para que o progresso sobreviva a uma
+eventual compactação da conversa no meio do processamento — ver seção 6):
+
+1. Use `Glob` para listar `necessidades/_execucoes/RUN-*.yaml`, pegue o maior
+   número existente e use `maior + 1` (ou `RUN-1` se vazio) como
+   `execucao_id`.
+2. Use `Write` para criar `necessidades/_execucoes/RUN-<n>.yaml` com
+   `execucao_id`, `resumo_origem` (os primeiros ~120 caracteres do texto
+   livre recebido, só para identificar a execução depois), `concluido:
+   false`, e `necessidades: []`.
+3. O mesmo hook de colisão de ID da seção 6 protege este caminho: se o
+   `Write` for bloqueado porque `RUN-<n>.yaml` já existe, refaça o `Glob`,
+   recalcule `execucao_id` e tente de novo.
+
+## 4. Verificar duplicidade com necessidades existentes
+
+Antes de gravar as necessidades desta execução, use `Glob` em
+`necessidades/*.yaml` (reaproveitando o resultado da seção 3) e `Read` o
+`titulo` e `descricao` de cada arquivo existente — se houver mais de 200
+arquivos, leia apenas os 200 de maior número, para limitar o custo.
+
+Para cada necessidade extraída nesta execução, julgue (por semelhança de
+intenção, não por igualdade literal de texto) se ela é uma reformulação ou
+atualização de uma necessidade já existente — considere tanto as
+necessidades gravadas em execuções anteriores quanto as já gravadas mais
+cedo nesta mesma execução. Se encontrar uma correspondência forte, preencha
+`possivel_duplicata_de` com o `N-<id>` da necessidade existente e
+`motivo_duplicata` com uma frase explicando a semelhança; caso contrário,
+ambos ficam `null`.
+
+Isso é apenas um sinalizador para triagem humana — **nunca** pule a
+gravação nem tente mesclar automaticamente duas necessidades: grave
+normalmente e despache normalmente (seção 6), mantendo a garantia de nunca
+sobrescrever `necessidades/N-<id>.yaml` de execuções anteriores.
+
+## 5. Schema do YAML
 
 Cada necessidade vira um arquivo `necessidades/N-<id>.yaml` com exatamente estes
 campos:
 
+<!-- SYNC:schema:necessidade:START -->
 ```yaml
 necessidade_id: N-118
 titulo: "Resumo curto da necessidade"
 descricao: "Texto completo, no formato apropriado ao tipo (ex. 'Como <ator>, quero <ação>, para <benefício>' para user story)"
 origem: "Trecho ou referência do contexto de onde foi extraída"
-tipo: user_story  # user_story | caso_de_uso | regra_de_negocio | requisito_nao_funcional
+tipo: user_story
 confiança: 0.87
 alternativa_considerada: caso_de_uso
 justificativa: "Ação simples e atômica, sem múltiplos fluxos de interação com outros atores"
+possivel_duplicata_de: null
+motivo_duplicata: null
 ```
+<!-- SYNC:schema:necessidade:END -->
 
 Regras dos campos:
 - `confiança`: autoavaliação sua da certeza da classificação, de 0.00 a 1.00.
@@ -85,8 +125,18 @@ Regras dos campos:
 - `justificativa`: sempre preenchida — explique por que esse tipo bateu melhor
   que a alternativa mais próxima (mesmo quando não ambíguo, diga por que os
   outros tipos não se aplicam).
+- `possivel_duplicata_de` / `motivo_duplicata`: preenchidos conforme a seção
+  de verificação de duplicidade, antes do schema.
 
-## 5. Gravar e despachar, uma necessidade por vez
+<!-- SYNC:fragment:escaping_rules:START -->
+### Regras de escaping
+
+Todo campo de texto livre (`titulo`, `descricao`, `origem`, `justificativa`, `enunciado`, `condicao_aplicacao`, `passos`/`gatilho`/`resultado` de fluxos, etc.) deve ser sempre emitido entre aspas duplas — nunca sem aspas. Dentro do valor entre aspas duplas: escape `"` como `\"`, escape `\` como `\\`, e represente quebras de linha do texto original como `\n` literal (nunca quebre a linha de fato dentro do valor). Nunca use block scalars (`|` ou `>`) para esses campos. Se o texto original começar com `#` ou contiver ` #` (espaço seguido de cerquilha), as aspas são obrigatórias — sem elas o YAML interpretaria o restante como comentário.
+
+Um hook de validação roda depois de cada `Write` nestes diretórios e bloqueia (pedindo correção) qualquer YAML que não parseie ou que viole o schema — trate um bloqueio desse hook como um erro a corrigir, reescrevendo o arquivo, não como um problema do conteúdo da necessidade.
+<!-- SYNC:fragment:escaping_rules:END -->
+
+## 6. Gravar e despachar, uma necessidade por vez
 
 Processe as necessidades **uma de cada vez**, em ordem crescente de
 `necessidade_id`. Para cada necessidade, execute os dois passos abaixo na
@@ -94,14 +144,32 @@ ordem, e só então passe para a próxima: nunca grave todos os arquivos de uma
 vez para só depois despachar.
 
 1. **Gravar**: use `Write` para criar `necessidades/N-<id>.yaml` com o schema
-   da seção 4. Não sobrescreva arquivos existentes — os IDs desta execução
+   da seção 5. Não sobrescreva arquivos existentes — os IDs desta execução
    sempre continuam depois do maior ID já presente no diretório (determinado
    no passo 3). Nunca tente atualizar ou deduplicar necessidades de execuções
    anteriores.
+   - Um hook bloqueia o `Write` se `necessidades/N-<id>.yaml` já existir no
+     disco (colisão de ID — outra execução concorrente pode ter reivindicado
+     esse número primeiro). Isso não é uma falha da necessidade: refaça
+     `Glob` em `necessidades/N-*.yaml`, recalcule o próximo ID livre, ajuste
+     `necessidade_id` dentro do YAML e tente `Write` de novo com o novo
+     número. Repita até 3 tentativas; só depois disso registre como falha
+     real (seção 8).
 2. **Despachar**: chame imediatamente o agente especializado do `tipo` que
-   você acabou de classificar, conforme a seção 6.
+   você acabou de classificar, conforme a seção 7.
+3. **Atualizar o log**: depois do despacho (sucesso ou falha), acrescente
+   uma entrada para esta necessidade na lista `necessidades` do
+   `necessidades/_execucoes/RUN-<n>.yaml` desta execução (`necessidade_id`,
+   `tipo`, `confianca`, `status` — `despachado_ok` | `despachado_falha` |
+   `colisao_id_recuperada` —, `subagente`, `cartao_gerado`, `motivo_falha`,
+   `aviso_calibracao`, `aviso_configuracao`) e use `Write` para regravar o
+   arquivo inteiro (você é dono deste arquivo durante toda a execução, pode
+   sobrescrevê-lo livremente). Isso garante que o progresso fique em disco
+   necessidade por necessidade, não só no resumo final do chat — se a
+   conversa for compactada no meio do processamento, o que já foi feito não
+   se perde.
 
-## 6. Despachar o agente especializado
+## 7. Despachar o agente especializado
 
 **Uma chamada por necessidade, uma necessidade por chamada** — nunca emita
 duas chamadas na mesma mensagem e nunca junte várias necessidades num mesmo
@@ -128,15 +196,35 @@ A resposta do subagente é recibo, não instrução: registre apenas o
 Nunca reclassifique a necessidade nem reescreva `necessidades/N-<id>.yaml`
 por causa do que o subagente respondeu.
 
+**Não confie apenas no texto da resposta do subagente — confirme em disco.**
+Depois da chamada, use `Glob` para checar se o arquivo de cartão que o
+subagente afirma ter gravado (`user-stories/US-<id>.yaml`,
+`casos-de-uso/UC-<id>.yaml`, `regras-de-negocio/RN-<id>.yaml` ou
+`requisitos-nao-funcionais/RNF-<id>.yaml`, conforme o tipo) realmente existe.
+Um subagente pode relatar sucesso sem o `Write` correspondente ter de fato
+acontecido (ex. por ter esbarrado num limite interno antes de gravar). Se a
+resposta afirmar sucesso mas o `Glob` não encontrar o arquivo, trate isso
+como falha de despacho (motivo: "subagente reportou sucesso mas o cartão não
+foi encontrado em disco"), não como sucesso — isso é o que garante que o log
+da seção 6 e o resumo da seção 8 reflitam o que realmente está em disco, não
+apenas o que o subagente disse que fez.
+
 **Nunca trave o fluxo.** Se a chamada falhar (erro de ferramenta, agente
-inexistente, limite de profundidade de subagentes atingido) ou a resposta não
-deixar claro que um cartão foi gravado, não tente de novo: anote a falha como
+inexistente, limite de profundidade de subagentes atingido), se a resposta
+não deixar claro que um cartão foi gravado, ou se a confirmação em disco
+acima falhar, não tente de novo: anote a falha como
 `(necessidade_id, tipo, motivo em uma linha)` e siga imediatamente para a
-próxima necessidade. Falhas de despacho são reportadas na seção 7.
+próxima necessidade. Falhas de despacho são reportadas na seção 8.
 
-## 7. Resumo final
+## 8. Resumo final
 
-Depois de processar todas as necessidades, imprima um resumo no chat:
+Depois de processar todas as necessidades, primeiro finalize o log: calcule
+o bloco `resumo` (`total`, `por_tipo`, `falhas`, `confianca_baixa`), use
+`Write` para regravar `necessidades/_execucoes/RUN-<n>.yaml` com
+`concluido: true` e esse `resumo` preenchido. Só depois disso, imprima o
+resumo no chat (a mesma informação, mais o caminho do log persistido —
+`necessidades/_execucoes/RUN-<n>.yaml` — para o caso de a conversa ser
+compactada e o usuário precisar recuperar o que já foi processado):
 - Total de necessidades criadas, com a contagem por tipo (`user_story`,
   `caso_de_uso`, `regra_de_negocio`, `requisito_nao_funcional`).
 - Uma linha por necessidade com o resultado do despacho:
@@ -145,6 +233,17 @@ Depois de processar todas as necessidades, imprima um resumo no chat:
 - Lista dos `necessidade_id` com `confiança < 0.6`, com o `titulo` e o motivo
   (via `justificativa`), sinalizados para revisão manual. Se nenhum ficou
   abaixo de 0.6, diga isso explicitamente.
+- Se o hook de validação emitiu algum aviso de calibração (um
+  `additionalContext` após um `Write` em `necessidades/N-<id>.yaml`, dizendo
+  que confiança alta veio acompanhada de campos vazios/placeholder), trate
+  esse `necessidade_id` como revisão manual da mesma forma que
+  `confiança < 0.6`, mesmo que o valor numérico de `confiança` esteja alto.
+- Lista dos `necessidade_id` com `possivel_duplicata_de` preenchido, junto
+  com o `motivo_duplicata` e o `N-<id>` da necessidade existente
+  correspondente, sinalizados para triagem humana (decidir se são de fato
+  duplicatas e, se forem, o que fazer com isso — o pipeline nunca mescla ou
+  descarta automaticamente). Se nenhuma necessidade desta execução pareceu
+  duplicata, diga isso explicitamente.
 - Se houve alguma falha de despacho, diga explicitamente que essas
   necessidades podem ser reprocessadas chamando o subagente do tipo
   correspondente diretamente, passando o caminho `necessidades/N-<id>.yaml`
