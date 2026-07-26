@@ -317,6 +317,13 @@ graphify explain "<conceito>"
 Depois de qualquer mudança de código, rode `graphify update .` para manter
 o grafo atualizado (só AST, sem custo de API).
 
+### Criando um plugin novo
+
+Quer criar um plugin Claude Code do zero seguindo os mesmos padrões deste
+repo (pipeline de subagentes, schema como fonte única de verdade, hooks
+determinísticos), ou registrar um segundo plugin neste
+`marketplace.json`? Veja [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Tratamento de falha
 
 O pipeline nunca trava: falha de despacho ou de auditoria é registrada e o
