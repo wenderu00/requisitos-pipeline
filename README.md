@@ -241,6 +241,82 @@ cruzadas) quebradas. `tests/integrity/` tem uma suíte sintética própria
 suíte deste repo capaz de rodar em CI. Detalhes em
 [`docs/integrity.md`](docs/integrity.md).
 
+## Desenvolvimento
+
+### Estrutura do repositório
+
+```
+agents/          cartões dos 7 subagentes (classificador, 4 especializados, 2 auditores)
+hooks/           hooks.json (registro dos guardrails determinísticos)
+schemas/         schemas.json — fonte única de verdade dos schemas de saída
+scripts/         scripts .mjs standalone
+  hooks/         claim-id.mjs (PreToolUse) e validate-card.mjs (PostToolUse)
+  vendor/        parser YAML vendorizado (js-yaml.mjs), sem dependência externa
+  check-integrity.mjs, sync-schemas.mjs
+docs/            detalhamento de hooks, schemas e verificação de integridade
+tests/
+  eval/          suíte de regressão de classificação (invoca o Claude Code real)
+  integrity/     suíte sintética de check-integrity.mjs (roda em CI)
+  fixtures/      pares input.md/expected.yaml usados por tests/eval
+.claude-plugin/  manifesto do plugin e do marketplace pessoal
+```
+
+Os diretórios `necessidades/`, `user-stories/`, `casos-de-uso/`,
+`regras-de-negocio/`, `requisitos-nao-funcionais/` (ver "Convenção de
+diretórios de saída" acima) **não fazem parte deste repositório** — são
+artefatos gravados no projeto de quem usa o plugin.
+
+### Requisitos
+
+Node.js ≥ 18 (`tests/integrity/` usa `node:test`, nativo, sem framework de
+teste externo). Zero dependências — não há `package.json`, não roda
+`npm install`; todos os scripts são `.mjs` puros, inclusive o parser YAML
+vendorizado em `scripts/vendor/js-yaml.mjs`.
+
+### Editando schemas
+
+Nunca edite os blocos `<!-- SYNC:...:START/END -->` diretamente nos
+arquivos `.md` — edite só `schemas/schemas.json` e rode:
+
+```
+node scripts/sync-schemas.mjs          # regenera os blocos em agents/*.md e README.md
+node scripts/sync-schemas.mjs --check  # só verifica divergência, não escreve nada
+```
+
+Detalhes de chaves de schema (`filename_regex`, `singleton_filename`,
+`item_pattern`) em [`docs/schemas.md`](docs/schemas.md).
+
+### Rodando os testes (este repo não tem CI)
+
+Checklist antes de considerar uma mudança pronta:
+
+```
+node scripts/sync-schemas.mjs --check   # schemas.json e blocos SYNC não divergiram
+node --test tests/integrity/            # suíte sintética, rápida, sem LLM
+node tests/eval/run.mjs                 # regressão de classificação — só depois de mexer
+                                         # nas regras de agents/classificador-requisitos.md;
+                                         # invoca o Claude Code real, custa chamadas de API
+```
+
+Uso detalhado de cada suíte em [`tests/README.md`](tests/README.md) e
+[`docs/integrity.md`](docs/integrity.md).
+
+### Explorando o código com graphify
+
+Este repositório tem um grafo de conhecimento navegável gerado pelo skill
+`graphify` em `graphify-out/` (god nodes, comunidades, relações entre
+arquivos), já integrado ao `CLAUDE.md` deste projeto. Em vez de grep bruto,
+prefira:
+
+```
+graphify query "<pergunta>"
+graphify path "<A>" "<B>"
+graphify explain "<conceito>"
+```
+
+Depois de qualquer mudança de código, rode `graphify update .` para manter
+o grafo atualizado (só AST, sem custo de API).
+
 ## Tratamento de falha
 
 O pipeline nunca trava: falha de despacho ou de auditoria é registrada e o
