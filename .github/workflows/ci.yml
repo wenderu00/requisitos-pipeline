@@ -1,0 +1,10 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    uses: wenderu00/workflows/.github/workflows/node-ci.yml@v1
