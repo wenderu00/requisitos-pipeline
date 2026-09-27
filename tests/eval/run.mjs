@@ -128,6 +128,14 @@ function runFixture(name) {
     if (result.status !== 0 && result.signal) {
       return { name, pass: false, reason: `claude CLI foi encerrado por timeout/sinal (${result.signal}) — considere aumentar CLI_TIMEOUT_MS` };
     }
+    try {
+      const out = JSON.parse(result.stdout);
+      const custo = typeof out.total_cost_usd === "number" ? `US$ ${out.total_cost_usd.toFixed(4)}` : "?";
+      const tempo = typeof out.duration_ms === "number" ? `${(out.duration_ms / 1000).toFixed(1)}s` : "?";
+      console.log(`  custo: ${custo} · tempo: ${tempo}`);
+    } catch {
+      // saída não-JSON (ex. erro do CLI): sem métrica, a checagem abaixo segue normal
+    }
   }
 
   const necessidades = readNecessidades(scratchDir);

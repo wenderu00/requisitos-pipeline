@@ -18,7 +18,6 @@ const TARGET_FILES = [
   "agents/agente-caso-de-uso.md",
   "agents/agente-regra-de-negocio.md",
   "agents/agente-requisito-nao-funcional.md",
-  "agents/auditor-qualidade.md",
   "README.md",
 ];
 

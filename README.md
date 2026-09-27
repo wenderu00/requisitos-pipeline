@@ -4,10 +4,10 @@
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
 ![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757)
 
-Plugin do Claude Code com um pipeline de 7 subagentes que transforma texto livre (o
+Plugin do Claude Code com um pipeline de 6 subagentes que transforma texto livre (o
 transcript de uma conversa de levantamento, notas de reunião, um e-mail) em **requisitos
 estruturados e versionados como YAML**: user stories, casos de uso, regras de negócio e
-requisitos não funcionais. Cada cartão passa por um auditor de qualidade, e hooks
+requisitos não funcionais. Cada cartão passa por uma autoavaliação de qualidade, e hooks
 determinísticos validam tudo contra JSON Schema antes de gravar.
 
 ### Exemplo
@@ -54,16 +54,16 @@ removido ou renomeado.
 texto livre (transcript, ex. saída do skill grill-me)
   -> classificador-requisitos
        carrega necessidades/_indice/INDEX.yaml (visão barata do que já existe)
-       extrai necessidades, grava necessidades/N-<id>.yaml
-       despacha, uma necessidade por vez, logo após gravar cada N-<id>:
+       extrai necessidades, grava todas as necessidades/N-<id>.yaml
+       agrupa por tipo e despacha em paralelo, uma chamada por tipo presente:
          user_story              -> agente-user-story        -> user-stories/US-<id>.yaml
          caso_de_uso              -> agente-caso-de-uso        -> casos-de-uso/UC-<id>.yaml
          regra_de_negocio         -> agente-regra-de-negocio   -> regras-de-negocio/RN-<id>.yaml
          requisito_nao_funcional  -> agente-requisito-nao-funcional -> requisitos-nao-funcionais/RNF-<id>.yaml
-       (os 4 acima leem o índice para visão mínima de outros artefatos e
-       referências cruzadas, e chamam auditor-qualidade internamente, até 3x
-       cada, com critérios de qualidade específicos do seu tipo)
-       atualiza necessidades/_indice/INDEX.yaml a cada necessidade despachada
+       (cada um processa o lote do seu tipo, lê o índice uma vez para visão
+       mínima de outros artefatos e referências cruzadas, e autoavalia cada
+       cartão contra a rubrica de qualidade do tipo, até 3 rodadas)
+       grava necessidades/_indice/INDEX.yaml uma vez, com base nos recibos
        ao final: chama auditor-coerencia uma vez (automático, best-effort)
        comparando os cartões já materializados entre si
 ```
@@ -90,11 +90,7 @@ chamar o agente especializado do tipo correspondente diretamente, passando
 `necessidades/N-<id>.yaml` — os agentes especializados sobrescrevem o cartão
 de forma determinística.
 
-`auditor-qualidade` é estritamente interno: só é chamado pelos 4 agentes
-especializados, um por vez (avaliador puro, sem `tools`, sem persistência
-própria), com critérios de qualidade diferentes por tipo de cartão.
-
-`auditor-coerencia` também é estritamente interno: só é chamado pelo
+`auditor-coerencia` é estritamente interno: só é chamado pelo
 `classificador-requisitos`, uma única vez ao final de cada execução
 (automático, best-effort — nunca trava o fluxo). Ele lê os cartões já
 materializados (não só o rascunho corrente) e reporta possíveis
@@ -143,8 +139,11 @@ preenchida. Schema completo em cada `agents/agente-*.md` deste plugin.
 
 Os 4 cartões especializados também levam:
 - Um bloco comum `auditoria_qualidade` (`veredito`, `rodadas` 1–3,
-  `feedback_pendente`, `motivo_falha_auditor`) — critérios avaliados variam
-  por tipo, ver `agents/auditor-qualidade.md`.
+  `feedback_pendente`, `motivo_falha_auditor`) — resultado da autoavaliação
+  contra a rubrica do tipo (seção "Rubrica de qualidade" de cada
+  `agents/agente-*.md`). `motivo_falha_auditor` é sempre `null` em cartões
+  novos; o campo existe só por compatibilidade com cartões gerados quando a
+  auditoria era um subagente separado.
 - `historico_auditoria` (lista, cap de 5 entradas mais recentes) —
   preserva o `auditoria_qualidade` de versões anteriores do cartão quando
   ele é reprocessado, em vez de simplesmente sobrescrever o veredito
@@ -180,13 +179,14 @@ mantido pelo `classificador-requisitos`: uma entrada por necessidade, com
 `necessidade_id`, `titulo`, `tipo`, `cartao_gerado`, `status_auditoria` e
 `substituida_por`. É a fonte barata (só títulos/IDs, não conteúdo completo)
 que os agentes especializados consultam para visão mínima de outros
-artefatos (critério `independente`/`duplicidade_semantica` do
-`auditor-qualidade`) e para preencher as referências cruzadas.
+artefatos (critérios `independente`/`duplicidade_semantica` da rubrica de
+qualidade) e para preencher as referências cruzadas. O classificador também
+o usa na checagem de duplicidade, no lugar de reler cada `N-<id>.yaml`.
 
 ## Fila de pendências de revisão
 
-Quando um cartão sai `reprovado_apos_limite` (esgotou as 3 chamadas ao
-`auditor-qualidade` sem aprovar), o agente especializado grava também
+Quando um cartão sai `reprovado_apos_limite` (esgotou as 3 rodadas de
+autoavaliação sem aprovar), o agente especializado grava também
 `necessidades/_pendencias/PEND-<US|UC|RN|RNF>-<id>.yaml` — uma fila real
 para revisão humana, com `resolvido: false`. Se o cartão for reprocessado
 depois e aprovar, o mesmo arquivo é atualizado para `resolvido: true`
@@ -202,18 +202,31 @@ pelo tipo correto, e marca no índice central que a antiga foi
 `substituida_por` a nova. O classificador nunca infere isso sozinho a
 partir da deduplicação automática — exige pedido explícito do usuário.
 
-## Profundidade de subagentes
+## Custo e paralelismo
 
-Cadeia real: `classificador-requisitos` (nível 1) → `agente-*` (nível 2) →
-`auditor-qualidade` (nível 3, chamado pelos 4 tipos de cartão, até 3
-chamadas por cartão). `auditor-coerencia` é um ramo irmão mais raso
-(nível 1 → nível 2, chamado direto pelo classificador), não empilhado sobre
-o ramo de auditoria de qualidade — não aumenta a profundidade máxima. Se
-você tiver `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` configurado baixo, aumente
-para pelo menos 3 — se estiver baixo demais, a falha aparece distinta no
-resumo final do agente especializado
-(`motivo_falha_auditor: falha_configuracao_profundidade`) para não ser
-confundida com um problema de conteúdo do cartão.
+Cadeia real: `classificador-requisitos` (nível 1) → `agente-*` e
+`auditor-coerencia` (nível 2). Não há nível 3, então
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` não precisa de ajuste.
+
+O pipeline foi desenhado para gastar poucas chamadas:
+- **Lote por tipo, em paralelo.** Uma execução abre no máximo 4 subagentes
+  especializados (um por tipo presente), todos na mesma mensagem, mais 1
+  `auditor-coerencia`. Antes eram 1 subagente por necessidade, em série,
+  mais até 3 chamadas de auditor por cartão.
+- **Autoavaliação inline.** A rubrica de qualidade fica no prompt de cada
+  agente especializado; não há subagente auditor.
+- **Modelos por papel.** `model: sonnet` no classificador e nos
+  especializados, `model: haiku` no `auditor-coerencia`.
+- **Menos turnos no orquestrador.** A duplicidade é checada contra os
+  títulos do índice (sem ler cada `N-<id>.yaml`), o log e o índice são
+  gravados uma vez por execução, e os cartões não são relidos: o
+  classificador usa o recibo estruturado dos especializados e só confirma a
+  existência dos arquivos com um `Glob` por diretório.
+
+Troca aceita: como os lotes rodam em paralelo, referências cruzadas entre
+artefatos de tipos diferentes criados **na mesma execução** não são
+preenchidas. As referências para artefatos de execuções anteriores
+continuam funcionando.
 
 ## Guardrails determinísticos (hooks)
 
@@ -239,12 +252,16 @@ execução (não só no final), um arquivo
 `execucao_id`, `resumo_origem`, `concluido`, e uma entrada por necessidade
 processada (`necessidade_id`, `tipo`, `confianca`, `status`, `subagente`,
 `cartao_gerado`, `motivo_falha`, `aviso_calibracao`, `aviso_configuracao`).
-`concluido: true` e o bloco `resumo` só são gravados no final.
+O arquivo é gravado em três momentos: vazio no início, com todas as
+necessidades em `status: aguardando_despacho` logo depois de gravá-las, e com
+o `status` final de cada uma (`despachado_ok`, `despachado_falha` ou
+`colisao_id_recuperada`) depois do despacho. `concluido: true` e o bloco
+`resumo` só são gravados no final.
 
 Isso existe porque o resumo impresso no chat só existe enquanto a conversa
 não for compactada — e o Claude Code compacta conversas longas
 automaticamente. Gravar o mesmo progresso como um artefato normal em disco,
-atualizado necessidade por necessidade, é o que permite recuperar o que já
+com checkpoint antes do despacho, é o que permite recuperar o que já
 foi processado mesmo que a conversa seja compactada no meio da execução (uma
 alternativa — um hook `PreCompact` tentando reconstruir esse estado a partir
 do transcript da conversa — foi descartada por não ter como reconstruir
@@ -274,7 +291,7 @@ suíte deste repo capaz de rodar em CI. Detalhes em
 ### Estrutura do repositório
 
 ```
-agents/          cartões dos 7 subagentes (classificador, 4 especializados, 2 auditores)
+agents/          cartões dos 6 subagentes (classificador, 4 especializados, auditor de coerência)
 hooks/           hooks.json (registro dos guardrails determinísticos)
 schemas/         schemas.json — fonte única de verdade dos schemas de saída
 scripts/         scripts .mjs standalone
@@ -354,18 +371,12 @@ determinísticos), ou registrar um segundo plugin neste
 
 ## Tratamento de falha
 
-O pipeline nunca trava: falha de despacho ou de auditoria é registrada e o
-processamento segue para a próxima necessidade. `classificador-requisitos`
-resume tudo no relatório final, incluindo necessidades com `confiança < 0.6`
-sinalizadas para revisão manual.
-
-Falha de auditoria de qualidade tem dois motivos distintos, e o resumo final
-de cada agente especializado sinaliza qual é: **falha de configuração**
-(`motivo_falha_auditor: falha_configuracao_profundidade` — o ambiente tem
-`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` baixo demais, não é um problema do
-cartão) versus **falha de conteúdo** (veredito `reprovado_apos_limite`, ou
-`motivo_falha_auditor: falha_auditor_outro`/`resposta_invalida` — este sim
-pede revisão manual do texto do cartão).
+O pipeline nunca trava: falha de despacho é registrada e o processamento
+segue. Se a chamada de um tipo falhar, todas as necessidades daquele lote
+ficam como `despachado_falha` e os outros tipos seguem normalmente.
+`classificador-requisitos` resume tudo no relatório final, incluindo as
+necessidades para revisão manual: `confiança < 0.6`, cartão
+`reprovado_apos_limite` na autoavaliação, ou aviso de calibração do hook.
 
 ## Licença
 
