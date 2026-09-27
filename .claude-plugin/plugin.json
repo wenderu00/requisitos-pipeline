@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "requisitos-pipeline",
   "version": "0.1.0",
-  "description": "Pipeline de 7 subagentes que classifica texto livre em requisitos estruturados (user story, caso de uso, regra de negocio, requisito nao funcional) e grava YAML por necessidade",
+  "description": "Pipeline de 6 subagentes que classifica texto livre em requisitos estruturados (user story, caso de uso, regra de negocio, requisito nao funcional) e grava YAML por necessidade",
   "author": {
     "name": "Marcio Wendell",
     "email": "marcio.wendell.contact@gmail.com"

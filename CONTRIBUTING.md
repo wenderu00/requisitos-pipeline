@@ -55,9 +55,10 @@ tools: Read, Write, Agent(outro-agente-a, outro-agente-b)
 ---
 ```
 
-Note o que **não** aparece: nenhum agente deste repo declara `model` no
-frontmatter — todos usam o default. Só adicione `model` se houver um motivo
-concreto (ex. um avaliador que precisa de mais raciocínio).
+`model` é opcional, mas neste repo todo agente declara um: sem ele, o
+agente herda o modelo da sessão (muitas vezes o mais caro). O classificador e
+os especializados usam `sonnet`; o `auditor-coerencia`, que só compara
+cartões, usa `haiku`. Escolha o modelo mais barato que dê conta do papel.
 
 ### Restringindo o call-graph com `tools: Agent(...)`
 
@@ -67,8 +68,8 @@ agente pode despachar. É assim que o pipeline impõe sua própria topologia:
 | Papel | Exemplo neste repo | `tools` |
 |---|---|---|
 | Orquestrador | `classificador-requisitos` | `Read, Write, Glob, Agent(agente-user-story, agente-caso-de-uso, agente-regra-de-negocio, agente-requisito-nao-funcional, auditor-coerencia)` |
-| Especialista | `agente-user-story` | `Read, Write, Agent(auditor-qualidade)` |
-| Avaliador puro | `auditor-qualidade` | `[]` (sem tools, sem persistência própria) |
+| Especialista | `agente-user-story` | `Read, Write` |
+| Avaliador | `auditor-coerencia` | `Read, Glob` (só lê, não grava nada) |
 
 Ao desenhar um pipeline novo, decida explicitamente esses três papéis antes
 de escrever qualquer prompt: quem orquestra, quem processa, quem só avalia
@@ -84,17 +85,20 @@ reproduzi-la aqui:
 
 1. Contrato de autonomia (não pausa para pedir esclarecimento; incerteza
    vira `confiança` baixa + `justificativa`).
-2. Entrada (aceita conteúdo bruto ou caminho de arquivo) + type-guard (se o
-   tipo recebido não é o esperado, aborta sem gravar).
+2. Entrada em lote (uma lista de itens do mesmo tipo, com conteúdo bruto ou
+   caminho de arquivo) + type-guard por item (se o tipo não é o esperado,
+   pula aquele item sem gravar).
 3. Contexto leve de outros artefatos (lê um índice barato — títulos/IDs, não
    conteúdo completo — antes de processar).
 4. Processamento específico do domínio.
-5. Loop de auditoria com **cap de tentativas** (chama o avaliador puro até N
-   vezes, nunca trava o pipeline em caso de falha do avaliador).
+5. Autoavaliação com **cap de rodadas** contra uma rubrica do tipo, escrita
+   no próprio prompt (sem subagente avaliador: cada subagente a mais é um
+   spawn frio e caro).
 6. Determinação determinística do ID de saída.
 7. Gravação (`Write`) — a fonte bruta de entrada nunca é sobrescrita; o
    cartão derivado sempre é, de forma determinística, ao reprocessar.
-8. Resumo final reportado ao chat.
+8. Recibo final estruturado (YAML), que o orquestrador consome sem reler
+   os arquivos gravados.
 
 Essa forma de "entrada → contexto barato → processar → auditar com cap →
 gravar → resumir" é o que vale generalizar para qualquer pipeline novo de
