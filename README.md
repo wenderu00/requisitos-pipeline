@@ -303,10 +303,10 @@ Uso detalhado de cada suíte em [`tests/README.md`](tests/README.md) e
 
 ### Explorando o código com graphify
 
-Este repositório tem um grafo de conhecimento navegável gerado pelo skill
-`graphify` em `graphify-out/` (god nodes, comunidades, relações entre
-arquivos), já integrado ao `CLAUDE.md` deste projeto. Em vez de grep bruto,
-prefira:
+O skill `graphify` gera um grafo de conhecimento navegável do repositório em
+`graphify-out/` (god nodes, comunidades, relações entre arquivos), já integrado
+ao `CLAUDE.md` deste projeto. O grafo não é versionado: gere-o localmente com
+`graphify .` e, em vez de grep bruto, prefira:
 
 ```
 graphify query "<pergunta>"
