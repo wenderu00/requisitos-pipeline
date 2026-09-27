@@ -1,17 +1,45 @@
 # requisitos-pipeline
 
-Pipeline de 7 subagentes que transforma texto livre (ex. transcript de uma
-sessão do skill `grill-me`, ou qualquer texto colado na conversa) em
-requisitos estruturados e versionados como YAML — user stories, casos de
-uso, regras de negócio e requisitos não funcionais.
+[![CI](https://github.com/wenderu00/requisitos-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/wenderu00/requisitos-pipeline/actions/workflows/ci.yml)
+[![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
+![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757)
+
+Plugin do Claude Code com um pipeline de 7 subagentes que transforma texto livre (o
+transcript de uma conversa de levantamento, notas de reunião, um e-mail) em **requisitos
+estruturados e versionados como YAML**: user stories, casos de uso, regras de negócio e
+requisitos não funcionais. Cada cartão passa por um auditor de qualidade, e hooks
+determinísticos validam tudo contra JSON Schema antes de gravar.
+
+### Exemplo
+
+Entrada:
+
+> Como cliente, eu quero adicionar um produto ao carrinho de compras, para poder comprá-lo depois.
+
+Saída, `user-stories/US-1.yaml` (exemplo ilustrativo do formato, abreviado):
+
+```yaml
+user_story_id: US-1
+necessidade_origem: N-1
+titulo: "Adicionar produto ao carrinho"
+ator: "cliente"
+acao: "adicionar um produto ao carrinho de compras"
+beneficio: "poder comprá-lo depois"
+criterios_aceite:
+  - dado: "o cliente está na página de um produto disponível"
+    quando: "ele clica em adicionar ao carrinho"
+    entao: "o produto aparece no carrinho com quantidade 1"
+auditoria_qualidade:
+  veredito: aprovado
+  rodadas: 1
+confiança: 0.9
+justificativa: "Formato 'Como X, quero Y, para Z' explícito, com um único ator e uma ação atômica."
+```
 
 ## Instalação
 
-Repositório privado — clone via SSH (a máquina precisa ter acesso SSH
-configurado a este repo; clone via HTTPS falha por falta de credencial):
-
 ```
-claude plugin marketplace add git@github.com:wenderu00/requisitos-pipeline.git
+claude plugin marketplace add wenderu00/requisitos-pipeline
 claude plugin install requisitos-pipeline@requisitos-pipeline
 ```
 
@@ -286,9 +314,9 @@ node scripts/sync-schemas.mjs --check  # só verifica divergência, não escreve
 Detalhes de chaves de schema (`filename_regex`, `singleton_filename`,
 `item_pattern`) em [`docs/schemas.md`](docs/schemas.md).
 
-### Rodando os testes (este repo não tem CI)
+### Rodando os testes
 
-Checklist antes de considerar uma mudança pronta:
+O CI roda a suíte de integridade (`npm test`) a cada push. Checklist antes de considerar uma mudança pronta:
 
 ```
 node scripts/sync-schemas.mjs --check   # schemas.json e blocos SYNC não divergiram
@@ -338,3 +366,7 @@ de cada agente especializado sinaliza qual é: **falha de configuração**
 cartão) versus **falha de conteúdo** (veredito `reprovado_apos_limite`, ou
 `motivo_falha_auditor: falha_auditor_outro`/`resposta_invalida` — este sim
 pede revisão manual do texto do cartão).
+
+## Licença
+
+[MIT](LICENSE)
